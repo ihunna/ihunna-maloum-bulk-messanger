@@ -1,0 +1,312 @@
+{% extends "layout.html"%}
+{% block title %}
+ Overview | 4basedmanager
+{% endblock %}
+{%block main_content%}
+    <div class="stats">
+        <div class="stat">
+            <h2>{{stats.tasks}}</h2>
+            <span>Tasks</span>
+        </div>
+        <div class="stat">
+            <h2>{{stats.creators}}</h2>
+            <span>Creators</span>
+        </div>
+        <div class="stat">
+            <h2>{{stats.messages}}</h2>
+            <span>Messages</span>
+        </div>
+    </div>
+    {%if messages|length > 0%}
+        <section class="messages">
+            <div class="holder table-container scroll scroll-v scroll-h" id="messages-table">
+                <div class="table-header">
+                    <div class="table-row">
+                        <div class="table-cell check-box">
+                            <input type="checkbox" id="check-all" onclick="selectAll(this,'messages-table')">
+                        </div>
+                        <div class="table-cell badge">Creator</div>
+                        <div class="table-cell">Price</div>
+                        <div class="table-cell">Has media</div>
+                        <div class="table-cell">Type</div>
+                        <div class="table-cell double-cell">Recipient</div>
+                        <div class="table-cell">Status</div>
+                        <div class="table-cell double-cell">Date</div>
+                        <div class="table-cell actions">Actions</div>
+                    </div>
+                </div>
+                <div class="table-body">
+                    {%for message in messages%}
+                        <div data-action-url="{{ url_for('messages',action='view-item',message=message.id) }}" 
+                            class="table-row" data-item="{{message.id}}" data-action-target="{{message.creator}}" id="{{message.id}}">
+                            <div class="table-cell check-box">
+                                <input type="checkbox" class="checkbox-row">
+                            </div>
+                            <div class="table-cell badge">
+                                <span class="bg-success">
+                                    {{message.creator_name|capitalize}}
+                                </span>
+                            </div>                             
+                            <div class="table-cell ">${{ message.price }}</div>
+                            <div class="table-cell ">{{ 'Yes' if message.has_media else 'No' }}</div>
+                            <div class="table-cell ">{{ 'PAID' if message.price > 0 else 'FREE' }}</div>
+                            <div class="table-cell double-cell">@{{ message.recipient_name }}</div>
+                                <div class="table-cell">{{ message.sender_status | upper}}</div>
+                            <div class="table-cell double-cell">{{message.created_at}}</div>
+                            <div class="table-cell actions">
+                                <ul class="actions-list">
+                                    <li class="tags">
+                                        <a href="{{message.link}}" target="_blank"
+                                            class="bg-primary light">
+                                            <i class="fas fa-eye"></i>
+                                            view
+                                        </a>
+                                    </li>
+                                    <li data-action="delete" data-action-url="/delete-items/messages" 
+                                    data-action-message="Deleting message {{message.id}}"
+                                    data-item="{{message.id}}" data-action-target="{{message.creator}}"
+                                    onclick="handleAction(this,'messages-table','single')">
+                                        <i class="fas fa-trash text-danger"></i>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    {%endfor%}
+                    <div class="table-row table-bottom">
+                        <div class="bottom-actions show">
+                            <div data-action="delete" data-action-url="/delete-items/messages" 
+                                data-action-message="Deleting messages" 
+                                class="action delete bg-danger light" onclick="handleAction(this,'messages-table','multiple')">
+                                Delete
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    {%endif%}
+    {%if creators|length > 0%}
+        <section class="creators">
+            <h3 class="header">
+                Creators
+            </h3>
+            <div class="holder table-container scroll scroll-v scroll-h" id="creators-table">
+                <div class="table-header">
+                    <div class="table-row">
+                    <div class="table-cell check-box">
+                        <input type="checkbox" id="check-all" onclick="selectAll(this,'creators-table')">
+                    </div>              
+                    <div class="table-cell badge">Username</div>
+                    <div class="table-cell double-cell">Last login</div>
+                    <div class="table-cell double-cell">Created on</div>
+                    <div class="table-cell actions">Actions</div>
+                    </div>
+                </div>
+                <div class="table-body">
+                    {%for creator in creators%}
+                        {%set creator_data = creator.data%}
+                        {%set creator_details = creator_data.details.user%}
+                        <div data-action-url="{{ url_for('creator',action='view-item',creator=creator.id) }}" 
+                            class="table-row" data-item="{{creator.id}}" data-action-target="{{creator.id}}" id="{{creator.id}}">
+                            <div class="table-cell check-box">
+                                <input type="checkbox" class="checkbox-row">
+                            </div>
+                            <div class="table-cell badge">
+                                <span class="bg-success">
+                                    {{creator_details.name|capitalize}}
+                                </span>
+                            </div>
+                            <div class="table-cell double-cell">{{creator_details.last_login}}</div>                             
+                            <div class="table-cell double-cell">{{ creator.created_at}}</div>
+                            <div class="table-cell actions">
+                                <ul class="actions-list">
+                                    <li class="tags">
+                                        <a href="/messages?action=get-items&item={{creator_details.identifier}}&key=creator"
+                                            class="bg-primary light">
+                                            <i class="fas fa-eye"></i>
+                                            messages
+                                        </a>
+                                    </li>
+                                    <li class="tags">
+                                        <a href="/configs?creator={{creator.id}}&tab=captions"
+                                            class="bg-primary light">
+                                            <i class="fas fa-tasks"></i>
+                                            captions
+                                        </a>
+                                    </li>
+                                    <li data-action="delete" data-action-url="/delete-items/creators" 
+                                    data-action-message="Deleting creator {{creator.id}}"
+                                    data-item="{{creator.id}}" data-action-target="{{creator.id}}"
+                                    onclick="handleAction(this,'creators-table','single')">
+                                        <i class="fas fa-trash text-danger"></i>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    {%endfor%}
+                    <div class="table-row table-bottom">
+                        <div class="bottom-actions show">
+                            <div data-action="delete" data-action-url="/delete-items/creators" 
+                                data-action-message="Deleting creators" 
+                                class="action delete bg-danger light" onclick="handleAction(this,'creators-table','multiple')">
+                                Delete
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    {%endif%}
+    {%if tasks|length > 0%}
+        <section class="tasks">
+            <h3 class="header">
+                Tasks
+            </h3>
+            <div class="holder table-container scroll scroll-v scroll-h" id="tasks-table">
+                <div class="table-header">
+                    <div class="table-row">
+                    <div class="table-cell check-box">
+                        <input type="checkbox" id="check-all" onclick="selectAll(this,'tasks-table')">
+                    </div>              
+                    <div class="table-cell">ID</div>
+                    <div class="table-cell double-cell">Action type</div>
+                    <div class="table-cell">Action count</div>
+                    <div class="table-cell double-cell">Date</div>
+                    <div class="table-cell badge">Status</div>
+                    <div class="table-cell actions">Actions</div>
+                    </div>
+                </div>
+                  <div class="table-body" id="messages-tasks-table-body">
+                    {# First, render running 'messages' tasks #}
+                    {% for task in tasks %}
+                        {% if task.type == 'messages' and task.status|lower == 'running' %}
+                            <div data-action-url="{{ url_for('tasks',action='view-item',task=task.id) }}" 
+                                class="table-row" data-item="{{task.id}}" data-action-target="{{task.creator}}" id="{{task.id}}">
+                                <div class="table-cell check-box">
+                                    <input type="checkbox" class="checkbox-row">
+                                </div>
+                                <div class="table-cell">
+                                    {{ task.id }}
+                              </div>  
+                                <div class="table-cell badge double-cell">Active DM task</div>
+                                <div class="table-cell">{{ task.action_count}}</div>                             
+                                <div class="table-cell double-cell">{{ task.created_at}}</div>
+                                <div class="table-cell badge task_status">
+                                    <span class="
+                                    {%if task.status|lower in ['success','completed','running','posting','liking','commenting']%}bg-success
+                                    {%elif task.status|lower in ['error','canceled','cancelled','failed','cancelling']%}bg-danger
+                                    {%elif task.status|lower == 'pending'%}bg-warning
+                                    {%endif%}">
+                                        {{task.status|capitalize}}
+                                    </span>
+                                </div>
+                                <div class="table-cell actions">
+                                    <ul class="actions-list">
+                                        {%if task.status == 'success'%}
+                                            <li class="tags">
+                                                {%if task.type == 'users'%}
+                                                    {%set _type_url = 'creators'%}
+                                                {%else%}
+                                                    {%set _type_url = task.type%}
+                                                {%endif%}
+                                                <a href="/{{_type_url | e}}?action=get-items&item={{task.id}}&key=task_id"
+                                                    class="bg-primary light">
+                                                    <i class="fas fa-eye"></i>
+                                                    {{task.type}}
+                                                </a>
+                                            </li>
+                                        {%endif%}
+                                        <li data-action="delete" data-action-url="/delete-items/tasks" 
+                                        data-action-message="Deleting Task {{task.id}}"
+                                        data-item="{{task.id}}" data-action-target="{{task.creator}}"
+                                        onclick="handleAction(this,'tasks-table','single')">
+                                            <i class="fas fa-trash text-danger"></i>
+                                        </li>
+                                        {%if task.status|lower in ['running','pending','posting','liking','commenting']%}
+                                            <li data-action="stop" data-action-url="/task/stop" 
+                                                data-action-message="Stopping Task {{task.id}}"
+                                                data-item="{{task.id}}" data-action-target="{{task.creator}}"
+                                                onclick="handleAction(this,'tasks-table','single')">
+                                                <i class="fas fa-stop text-danger"></i>
+                                            </li>
+                                        {%endif%}
+                                    </ul>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                <div class="table-body" id="other-tasks-table-body">
+                    {# Then, render all other tasks (excluding running 'messages') #}
+                    {% for task in tasks %}
+                        {% if not (task.type == 'messages' and task.status|lower == 'running') %}
+                            <div data-action-url="{{ url_for('tasks',action='view-item',task=task.id) }}" 
+                                class="table-row" data-item="{{task.id}}" data-action-target="{{task.creator}}" id="{{task.id}}">
+                                <div class="table-cell check-box">
+                                    <input type="checkbox" class="checkbox-row">
+                                </div>
+                                <div class="table-cell">
+                                    {{ task.id }}
+                              </div>  
+                                <div class="table-cell badge double-cell">{{ task.type}}</div> 
+                                <div class="table-cell">{{ task.action_count}}</div>                             
+                                <div class="table-cell badge double-cell">{{ task.created_at}}</div>
+                                <div class="table-cell badge task_status">
+                                    <span class="
+                                    {%if task.status|lower in ['success','completed','running','posting','liking','commenting']%}bg-success
+                                    {%elif task.status|lower in ['error','canceled','cancelled','failed','cancelling']%}bg-danger
+                                    {%elif task.status|lower == 'pending'%}bg-warning
+                                    {%endif%}">
+                                        {{task.status|capitalize}}
+                                    </span>
+                                </div>
+                                <div class="table-cell actions">
+                                    <ul class="actions-list">
+                                        {%if task.status == 'success'%}
+                                            <li class="tags">
+                                                {%if task.type == 'users'%}
+                                                    {%set _type_url = 'creators'%}
+                                                {%else%}
+                                                    {%set _type_url = task.type%}
+                                                {%endif%}
+                                                <a href="/{{_type_url | e}}?action=get-items&item={{task.id}}&key=task_id"
+                                                    class="bg-primary light">
+                                                    <i class="fas fa-eye"></i>
+                                                    {{task.type}}
+                                                </a>
+                                            </li>
+                                        {%endif%}
+                                        <li data-action="delete" data-action-url="/delete-items/tasks" 
+                                        data-action-message="Deleting Task {{task.id}}"
+                                        data-item="{{task.id}}" data-action-target="{{task.creator}}"
+                                        onclick="handleAction(this,'tasks-table','single')">
+                                            <i class="fas fa-trash text-danger"></i>
+                                        </li>
+                                        {%if task.status|lower in ['running','pending','posting','liking','commenting']%}
+                                            <li data-action="stop" data-action-url="/task/stop" 
+                                                data-action-message="Stopping Task {{task.id}}"
+                                                data-item="{{task.id}}" data-action-target="{{task.creator}}"
+                                                onclick="handleAction(this,'tasks-table','single')">
+                                                <i class="fas fa-stop text-danger"></i>
+                                            </li>
+                                        {%endif%}
+                                    </ul>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                    <div class="table-row table-bottom">
+                        <div class="bottom-actions show">
+                            <div data-action="delete" data-action-url="/delete-items/tasks" 
+                                data-action-message="Deleting tasks" 
+                                class="action delete bg-danger light" onclick="handleAction(this,'tasks-table','multiple')">
+                                Delete
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    {%endif%}
+{%endblock%}

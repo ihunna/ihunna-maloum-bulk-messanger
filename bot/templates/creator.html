@@ -1,0 +1,126 @@
+{% extends "layout.html"%}
+{% block title %}
+ Creator
+{% endblock %}
+{%block main_content%}
+    <section class="creator">
+        <div class="details">
+            <ul class="main">
+                <li class="name">@{{creator.username}}</li>
+                <li class="tags">
+                    {%if creator.isVerified%}
+                        {%set v_status = 'approved'%}
+                    {%else%}
+                        {%set v_status = 'not verified'%}
+                    {%endif%}
+                    <div class="{%if v_status == 'approved'%}bg-success{%else%}bg-warning {%endif%}">
+                        {{v_status}}
+                    </div>
+                    {% if creator.subscriptionPrice is none%}
+                        {%set status = 'free'%}
+                    {%else%}
+                        {% set status = 'Paid'%}
+                    {%endif%}
+                    <div class="{%if creator.subscriptionPrice%}bg-success{%else%}bg-warning {%endif%}">
+                        {{status}}
+                    </div>
+                </li>
+                <li><span>Email:</span> {{creator.email}}</li>
+                <li><span>User ID:</span> {{creator._id}}</li>
+                <li><span>Last login:</span> {{creator.last_login | datetime}}</li>
+               
+                <li class="double roles">
+                    <span>Roles:</span> {%if creator.isCreator%} Creator {%else%} client {%endif%}
+                </li>
+            </ul>
+            <div class="stats">
+                {%if creator.profilePictureThumbnail != None%}
+                    {%set avatar = creator.profilePictureThumbnail.get('url')%}
+                    <div class="avatar" style="background-image: url({{avatar}});">
+                    </div>
+                {%endif%}
+                <ul>
+                    <li class="double">
+                        <span>
+                            Posts
+                        </span>
+                            {%set post_count = creator.get('publicPostCount',0) + creator.get('privatePostCount',0) + creator.get('productCount',0)%}
+                        <div class="
+                            {%if post_count >= 10%}
+                            bg-success
+                            {%elif post_count == 0%}bg-danger
+                            {%else%} bg-warning
+                            {%endif%}">
+                            {{post_count}}
+                        </div>
+                    </li>
+                    {% if category == 'creators' %}
+                        <li class="double">
+                            <span>
+                                Priced posts
+                            </span>
+                            {%set data_count = creator.productCount%}
+                            <div class="
+                                {%if data_count >= 10%}
+                                bg-success
+                                {%elif data_count == 0%}bg-danger
+                                {%else%} bg-warning
+                                {%endif%}">
+                                {{creator.productCount}}
+                            </div>
+                        </li>
+                        <li class="double">
+                            <span>
+                                Likes
+                            </span>
+                            {%set likes_count = creator.postLikeCount%}
+                            <div class="
+                                {%if likes_count >= 10%}
+                                bg-success
+                                {%elif likes_count == 0%}bg-danger
+                                {%else%} bg-warning
+                                {%endif%}">
+                                {{likes_count}}
+                            </div>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+        <div class="settings">
+            <div class="toggles">
+                <div class="toggle-container">
+                    <span class="toggle-label">Reuse IP</span>
+                    {%if reuse_ip%}
+                        <div data-action-url="/creator"
+                            data-action="edit-ip-status" data-action-status="no"
+                            data-action-key="reuse_ip"
+                            data-action-creator="{{creator_id}}"
+                            class="toggle-btn positive active" onclick="toggleButton('external')">
+                            <div class="slider"></div>
+                        </div>
+                    {%else%}
+                        <div data-action-url="/creator"
+                            data-action="edit-ip-status" data-action-status="yes"
+                            data-action-key="reuse_ip"
+                            data-action-creator="{{creator_id}}"
+                            class="toggle-btn negative" onclick="toggleButton('external')">
+                            <div class="slider"></div>
+                        </div>
+                    {%endif%}
+                  </div>
+            </div>
+            <form action="/creator" id="update-media-form">
+                <input type="text" value="{{post_id}}" name="post-id">
+                <input type="hidden" value="{{creator_id}}" name="creator-id">
+                <button type="submit" class="bg-success">Save</button>
+            </form>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const form = document.getElementById('update-media-form');
+                    if (form) updateMediaId(form);
+                });
+            </script>
+        </div>
+    </section>
+{%endblock%}
