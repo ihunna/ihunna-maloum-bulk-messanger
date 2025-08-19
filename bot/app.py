@@ -732,6 +732,11 @@ def configs():
         Utils.write_log(error)
         abort(500)
 
+@app.route('/some-redirect-example')
+def example_redirect():
+    # Example of redirect using url_for instead of hardcoded path
+    return redirect(url_for('index'))
+
 @app.route('/media/<creator>/<folder>/<filename>', methods=['GET'])
 def serve_image(creator, folder, filename):
     if folder in ['images', 'used_images']:
