@@ -52,39 +52,39 @@ Configs
                     {%else%}
                         {%set _tab = tab%}
                         <li class="{%if tab=='captions'%} active {%endif%}">
-                            <a href="/configs?tab=captions&creator={{creator}}">
+                            <a href="{{ url_for('configs', tab='captions', creator=creator) }}">
                                 Captions
                             </a>
                         </li>
                         <!-- <li class="{%if tab=='comments'%} active {%endif%}">
-                            <a href="/configs?tab=comments&creator={{creator}}">
+                            <a href="{{ url_for('configs', tab='comments', creator=creator) }}">
                                 Comments
                             </a>
                         </li> -->
                         <!-- <li class="{%if tab=='images'%} active {%endif%}">
-                            <a href="/configs?tab=images&creator={{creator}}">
+                            <a href="{{ url_for('configs', tab='images', creator=creator) }}">
                                 Images
                             </a>
                         </li>
                         <li class="{%if tab=='used_images'%} active {%endif%}">
-                            <a href="/configs?tab=used_images&creator={{creator}}">
+                            <a href="{{ url_for('configs', tab='used_images', creator=creator) }}">
                                 Used images
                             </a>
                         </li>
                       
                         <li class="{%if tab=='videos'%} active {%endif%}">
-                            <a href="/configs?tab=videos&creator={{creator}}">
+                            <a href="{{ url_for('configs', tab='videos', creator=creator) }}">
                                 Videos
                             </a>
                         </li>
                         <li class="{%if tab=='used_videos'%} active {%endif%}">
-                            <a href="/configs?tab=used_videos&creator={{creator}}">
+                            <a href="{{ url_for('configs', tab='used_videos', creator=creator) }}">
                                 Used videos
                             </a>
                         </li> -->
                         {%if tab not in ['captions','comments']%}
                             <li class="upload-{{tab}}">
-                                <a href="/configs?creator={{creator}}&tab=upload-{{_tab|replace('used_','')}}">
+                                <a href="{{ url_for('configs', creator=creator, tab='upload-' ~ _tab|replace('used_', '')) }}">
                                     Upload {{_tab|replace('used_','')}}
                                 </a>
                             </li>
@@ -96,23 +96,23 @@ Configs
             <div class="configs-nav scroll scroll-h">
                 <ul>
                     <li class="{%if category=='proxies'%} active {%endif%}">
-                        <a href="/configs?tab=proxies">
+                        <a href="{{ url_for('configs', tab='proxies') }}">
                             Proxies
                         </a>
                     </li>
                     <li class="{%if category=='captions'%} active {%endif%}">
-                        <a href="/files/captions">
+                        <a href="{{ url_for('files', category='captions') }}">
                             Captions
                         </a>
                     </li>
                     <!-- <li class="{%if category=='comments'%} active {%endif%}">
-                        <a href="/files/comments">
+                        <a href="{{ url_for('files', category='comments') }}">
                             Comments
                         </a>
                     </li> -->
                     {%if category in ['creators','users']%}
                         <li class="active">
-                            <a href="/files/{{category}}">
+                            <a href="{{ url_for('files', category=category) }}">
                                 Add {{category}}
                             </a>
                         </li>

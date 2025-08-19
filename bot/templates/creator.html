@@ -110,7 +110,7 @@
                     {%endif%}
                   </div>
             </div>
-            <form action="/creator" id="update-media-form">
+            <form action="{{ url_for('creator') }}" id="update-media-form">
                 <input type="text" value="{{post_id}}" name="post-id">
                 <input type="hidden" value="{{creator_id}}" name="creator-id">
                 <button type="submit" class="bg-success">Save</button>
