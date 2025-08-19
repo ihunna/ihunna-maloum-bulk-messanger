@@ -67,7 +67,7 @@
                                             <i class="fas fa-trash text-danger"></i>
                                         </li>
                                         {%if task.status|lower in ['running','pending','posting','liking','commenting']%}
-                                            <li data-action="stop" data-action-url="/task/stop" 
+                                            <li data-action="stop" data-action-url="{{ url_for('update_task', action='stop') }}" 
                                                 data-action-message="Stopping Task {{task.id}}"
                                                 data-item="{{task.id}}" data-action-target="{{task.creator}}"
                                                 onclick="handleAction(this,'tasks-table','single')">
@@ -114,21 +114,27 @@
                                                 {%else%}
                                                     {%set _type_url = task.type%}
                                                 {%endif%}
-                                                <a href="/{{_type_url | e}}?action=get-items&item={{task.id}}&key=task_id"
+                                                <a href="{{ url_for(_type_url, action='get-items', item=task.id, key='task_id') }}"
                                                     class="bg-primary light">
                                                     <i class="fas fa-eye"></i>
                                                     {{task.type}}
                                                 </a>
                                             </li>
                                         {%endif%}
-                                        <li data-action="delete" data-action-url="/delete-items/tasks" 
+                                        <li data-action="delete" data-action-url="{{ url_for('delete', category='tasks') }}" 
+                                        data-action-message="Deleting Task {{task.id}}"
+                                        data-item="{{task.id}}" data-action-target="{{task.creator}}"
+                                        onclick="handleAction(this,'tasks-table','single')">
+                                            <i class="fas fa-trash text-danger"></i>
+                                        </li>
+                                        <li data-action="delete" data-action-url="{{ url_for('delete', category='tasks') }}" 
                                         data-action-message="Deleting Task {{task.id}}"
                                         data-item="{{task.id}}" data-action-target="{{task.creator}}"
                                         onclick="handleAction(this,'tasks-table','single')">
                                             <i class="fas fa-trash text-danger"></i>
                                         </li>
                                         {%if task.status|lower in ['running','pending','posting','liking','commenting']%}
-                                            <li data-action="stop" data-action-url="/task/stop" 
+                                            <li data-action="stop" data-action-url="{{ url_for('update_task', action='stop') }}" 
                                                 data-action-message="Stopping Task {{task.id}}"
                                                 data-item="{{task.id}}" data-action-target="{{task.creator}}"
                                                 onclick="handleAction(this,'tasks-table','single')">
@@ -141,13 +147,13 @@
                         {% endif %}
                     {% endfor %}
                     <div class="table-row table-bottom">
-                        <div class="bottom-actions show">
-                            <div data-action="delete" data-action-url="/delete-items/tasks" 
-                                data-action-message="Deleting tasks" 
-                                class="action delete bg-danger light" onclick="handleAction(this,'tasks-table','multiple')">
-                                Delete
+                            <div class="bottom-actions show">
+                                <div data-action="delete" data-action-url="{{ url_for('delete', category='tasks') }}" 
+                                    data-action-message="Deleting tasks" 
+                                    class="action delete bg-danger light" onclick="handleAction(this,'tasks-table','multiple')">
+                                    Delete
+                                </div>
                             </div>
-                        </div>
                         <div class="bottom-nav">
                             <div class="sum-total">{{ current_page}} / {{total_tasks}}</div>
                             <div class="more-less">

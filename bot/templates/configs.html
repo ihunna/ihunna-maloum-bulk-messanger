@@ -132,18 +132,18 @@ Configs
                     {%if action and action == 'get-items'%}
                         {%set item = item%}
                     {%endif%}
-                    <li id="display-type">
-                        <i class="fas fa-filter"></i>
-                        <span>filter by</span>
-                        <div class="actions">
-                            <a href="/configs?tab={{tab}}&creator={{creator}}&category=sfw" 
-                            class="{%if category == 'sfw'%} active {%endif%} ">SFW</a>
-                            <a href="/configs?tab={{tab}}&creator={{creator}}&category=nsfw" 
-                            class="{%if category == 'nsfw'%} active {%endif%} ">NSFW</a>
-                            <a href="/configs?tab={{tab}}&creator={{creator}}" 
-                            class="">Clear</a>
-                        </div>
-                    </li>
+                            <li id="display-type">
+                                <i class="fas fa-filter"></i>
+                                <span>filter by</span>
+                                <div class="actions">
+                                    <a href="{{ url_for('configs', tab=tab, creator=creator, category='sfw') }}" 
+                                    class="{%if category == 'sfw'%} active {%endif%} ">SFW</a>
+                                    <a href="{{ url_for('configs', tab=tab, creator=creator, category='nsfw') }}" 
+                                    class="{%if category == 'nsfw'%} active {%endif%} ">NSFW</a>
+                                    <a href="{{ url_for('configs', tab=tab, creator=creator) }}" 
+                                    class="">Clear</a>
+                                </div>
+                            </li>
                 </ul>
             </div>
             <div class="grid-container">
@@ -207,10 +207,10 @@ Configs
         {%elif tab == 'files'%}
             <div class="configs-container">
                 {%if category in ['proxies','captions','comments']%}
-                    <form action="" id="configs-form" data-action="update" 
-                        data-action-message="Updating file"
-                        data-action-category="{{category}}",
-                        data-action-url="/files/{{category}}/update">
+                            <form action="" id="configs-form" data-action="update" 
+                                data-action-message="Updating file"
+                                data-action-category="{{category}}"
+                                data-action-url="{{ url_for('handle_files', category=category) }}">
                         {%if configs and configs|length > 0%}
                             <textarea class="scroll scroll-v" name="configs" >{%for config in configs%}{{config}}{%endfor%}</textarea>
                         {%else%}
@@ -222,11 +222,11 @@ Configs
                         <input type="submit" value="Update">
                     </form>
                 {%else%}
-                    <form action="" id="configs-form" data-action="create" 
-                        data-action-message="Adding {{category}}"
-                        data-action-category="{{category}}"
-                        data-action-url="/creators/add"
-                        data-action-next-url="/tasks">
+                        <form action="" id="configs-form" data-action="create" 
+                            data-action-message="Adding {{category}}"
+                            data-action-category="{{category}}"
+                            data-action-url="{{ url_for('handle_creators', action='add') }}"
+                            data-action-next-url="{{ url_for('tasks') }}">
                     
                         <textarea class="scroll scroll-v" name="configs" id="configs-textarea" 
                             placeholder="Type email:password here separated by single newline (enter key)...&#13;&#10;{{category}} are universal" required></textarea>
@@ -249,11 +249,11 @@ Configs
 
         {%elif tab == 'comments'%}
             <div class="configs-container">
-                <form action="" id="configs-form"
-                    data-action="update" 
-                    data-action-message="Comments update"
-                    data-action-category="comments"
-                    data-action-url="/config/comments/update/{{creator}}">
+                    <form action="" id="configs-form"
+                        data-action="update" 
+                        data-action-message="Comments update"
+                        data-action-category="comments"
+                        data-action-url="{{ url_for('config', tab='comments', action='update', creator=creator) }}">
                     {%if comments and comments|length > 0%}
                         <textarea class="scroll scroll-v" name="configs" >{%for comment in comments%}{{comment}}{%endfor%}</textarea>
                     {%else%}
@@ -268,11 +268,11 @@ Configs
 
         {%else%}
             <div class="configs-container">
-                <form action="" id="configs-form"
-                    data-action="update" 
-                    data-action-message="Captions update"
-                    data-action-category="captions"
-                    data-action-url="/config/captions/update/{{creator}}">
+                    <form action="" id="configs-form"
+                        data-action="update" 
+                        data-action-message="Captions update"
+                        data-action-category="captions"
+                        data-action-url="{{ url_for('config', tab='captions', action='update', creator=creator) }}">
                     {%if captions and captions|length > 0%}
                         <textarea class="scroll scroll-v" name="configs" >{%for cap in captions%}{{cap}}{%endfor%}</textarea>
                     {%else%}

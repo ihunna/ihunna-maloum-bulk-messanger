@@ -7,8 +7,8 @@
         <section class="edit-admin">
             <div class="holder form-holder">
                 <form action="" id="admins-form" data-action="Edit admin" 
-                    data-action-url="/admins/update" data-action-message="Updating admin..." 
-                    data-next-action-url="/admins?action=view-item&admin={{admin.id}}">
+                    data-action-url="{{ url_for('handle_admin', action='update') }}" data-action-message="Updating admin..." 
+                    data-next-action-url="{{ url_for('admins', action='view-item', admin=admin.id) }}">
                     <h3 class="form-header">
                         Fill the form to edit admin details.
                     </h3>
@@ -44,16 +44,16 @@
             <section class="admins">
                 <div class="configs-nav scroll scroll-h">
                     <ul>
-                        <li class="{%if tab=='all'%} active {%endif%}">
-                            <a href="/admins?tab=all">
-                                All
-                            </a>
-                        </li>
-                        <li class="{%if tab=='me'%} active {%endif%}">
-                            <a href="/admins?tab=me">
-                                Me
-                            </a>
-                        </li>
+                    <li class="{%if tab=='all'%} active {%endif%}">
+                        <a href="{{ url_for('admins', tab='all') }}">
+                            All
+                        </a>
+                    </li>
+                    <li class="{%if tab=='me'%} active {%endif%}">
+                        <a href="{{ url_for('admins', tab='me') }}">
+                            Me
+                        </a>
+                    </li>
                     </ul>
                 </div>
                 <div class="holder table-container scroll scroll-v scroll-h" id="admins-table">
@@ -91,14 +91,14 @@
                                 <div class="table-cell actions">
                                     <ul class="actions-list">
                                         <li class="tags">
-                                            <a href="/posts?action=get-items&item={{admin.id}}&key=admin"
-                                                class="bg-primary light">
-                                                <i class="fas fa-eye"></i>
-                                                posts
-                                            </a>
+                                        <a href="{{ url_for('posts', action='get-items', item=admin.id, key='admin') }}"
+                                            class="bg-primary light">
+                                            <i class="fas fa-eye"></i>
+                                            posts
+                                        </a>
                                         </li>
                                         {%if session_admin and session_admin.role == 'super-admin'%}
-                                            <li data-action="delete" data-action-url="/delete-items/admins" 
+                                            <li data-action="delete" data-action-url="{{ url_for('delete', category='admins') }}" 
                                             data-action-message="Deleting admin {{admin.id}}"
                                             data-item="{{admin.id}}" data-action-target="{{admin.id}}"
                                             onclick="handleAction(this,'admins-table','single')">
@@ -116,7 +116,7 @@
                         {%endfor%}
                         <div class="table-row table-bottom">
                             <div class="bottom-actions show">
-                                <div data-action="delete" data-action-url="/delete-items/admins" 
+                                <div data-action="delete" data-action-url="{{ url_for('delete', category='admins') }}" 
                                     data-action-message="Deleting admins" 
                                     class="action delete bg-danger light" onclick="handleAction(this,'admins-table','multiple')">
                                     Delete
@@ -125,11 +125,11 @@
                             <div class="bottom-nav">
                                 <div class="sum-total">{{current_page}} / {{total_admins}}</div>
                                 <div class="more-less">
-                                    <a href="/admins?page={{prev_page}}">
+                                    <a href="{{ url_for('admins', page=prev_page) }}">
                                         <i class="fas fa-chevron-left"></i>
                                     </a>
                                     &nbsp; &nbsp;
-                                    <a href="/admins?page={{next_page}}">
+                                    <a href="{{ url_for('admins', page=next_page) }}">
                                         <i class="fas fa-chevron-right"></i>
                                     </a>
                                 </div>

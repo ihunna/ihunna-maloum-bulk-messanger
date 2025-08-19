@@ -68,7 +68,7 @@
                         </div>
                         <div class="actions">
                             {%if item.status == 'pending'%}
-                                <div data-action="stop" data-action-url="/task/stop" 
+                                <div data-action="stop" data-action-url="{{ url_for('update_task', action='stop') }}" 
                                     data-action-message="Stopping Task {{item.id}}"
                                     data-item="{{item.id}}" data-action-target="{{item.id}}"
                                     onclick="handleAction(this,'tasks-table','single')"

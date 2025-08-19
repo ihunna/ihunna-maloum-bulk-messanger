@@ -7,7 +7,7 @@
         <div class="configs-nav scroll scroll-h">
             <ul>
                 <li>
-                    <a href="/files/users">
+                    <a href="{{ url_for('files', category='users') }}">
                         Add users
                     </a>
                 </li>
@@ -45,13 +45,13 @@
                             <div class="table-cell actions">
                                 <ul class="actions-list">
                                     <li class="tags">
-                                        <a href="/configs?creator={{creator.id}}&tab=captions"
-                                            class="bg-primary light">
-                                            <i class="fas fa-tasks"></i>
-                                            captions
-                                        </a>
+                                    <a href="{{ url_for('configs', creator=creator.id, tab='captions') }}"
+                                        class="bg-primary light">
+                                        <i class="fas fa-tasks"></i>
+                                        captions
+                                    </a>
                                     </li>
-                                    <li data-action="delete" data-action-url="/delete-items/creators" 
+                                    <li data-action="delete" data-action-url="{{ url_for('delete', category='creators') }}" 
                                     data-action-message="Deleting creator {{creator.id}}"
                                     data-item="{{creator.id}}" data-action-target="{{creator.id}}"
                                     onclick="handleAction(this,'creators-table','single')">
@@ -62,13 +62,13 @@
                         </div>
                     {%endfor%}
                     <div class="table-row table-bottom">
-                        <div class="bottom-actions show">
-                            <div data-action="delete" data-action-url="/delete-items/creators" 
-                                data-action-message="Deleting creators" 
-                                class="action delete bg-danger light" onclick="handleAction(this,'creators-table','multiple')">
-                                Delete
+                            <div class="bottom-actions show">
+                                <div data-action="delete" data-action-url="{{ url_for('delete', category='creators') }}" 
+                                    data-action-message="Deleting creators" 
+                                    class="action delete bg-danger light" onclick="handleAction(this,'creators-table','multiple')">
+                                    Delete
+                                </div>
                             </div>
-                        </div>
                         <div class="bottom-nav">
                             <div class="sum-total">{{ current_page}} / {{total_creators}}</div>
                             <div class="more-less">

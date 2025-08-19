@@ -61,9 +61,9 @@
     {%if action == 'start-messaging'%}
         <section class="add-message">
             <div class="holder form-holder">
-                <form action="" id="messages-form" data-action="Create message" 
-                    data-action-url="/start-messaging" data-action-message="Creating message..." 
-                    data-next-action-url="/tasks">
+                    <form action="" id="messages-form" data-action="Create message" 
+                        data-action-url="{{ url_for('handle_messages') }}" data-action-message="Creating message..." 
+                        data-next-action-url="{{ url_for('tasks') }}">
                     <h3 class="form-header">
                         Fill the form to start operation for all added creators, add more messages if needed.
                     </h3>
@@ -343,7 +343,7 @@
                                                 view
                                             </a>
                                         </li>
-                                        <li data-action="delete" data-action-url="/delete-items/messages" 
+                                        <li data-action="delete" data-action-url="{{ url_for('delete', category='messages') }}" 
                                         data-action-message="Deleting message {{message.id}}"
                                         data-item="{{message.id}}" data-action-target="{{message.creator}}"
                                         onclick="handleAction(this,'messages-table','single')">
@@ -355,7 +355,7 @@
                         {%endfor%}
                         <div class="table-row table-bottom">
                             <div class="bottom-actions show">
-                                <div data-action="delete" data-action-url="/delete-items/messages" 
+                                <div data-action="delete" data-action-url="{{ url_for('delete', category='messages') }}" 
                                     data-action-message="Deleting messages" 
                                     class="action delete bg-danger light" onclick="handleAction(this,'messages-table','multiple')">
                                     Delete

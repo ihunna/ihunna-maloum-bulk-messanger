@@ -18,14 +18,14 @@
                         </li>
                     {%endfor%}
                 </ul>
-                <div class="clear-logs">
-                    <div class="" data-action-url="/logs/clear" 
-                        data-action-message="Clearing logs ..."
-                        data-action="Clear logs" 
-                        id="clear-logs">
-                        Clear logs
+                    <div class="clear-logs">
+                        <div class="" data-action-url="{{ url_for('handle_logs', action='clear') }}" 
+                            data-action-message="Clearing logs ..."
+                            data-action="Clear logs" 
+                            id="clear-logs">
+                            Clear logs
+                        </div>
                     </div>
-                </div>
             {%endif%}
         </section>
     </div>
@@ -79,12 +79,12 @@
                 if (response.ok) {
                     const responseData = await response.json();
                     toogleLoader('show', `${action} successful  &nbsp;<i class="fas fa-check icon"></i>`,'success');
-                    setTimeout(() => {
-                        toogleLoader('no-show');
-                        setTimeout(() => {
-                            window.location.href = `/logs`;
-                        }, 700);
-                    }, 3000);
+                            setTimeout(() => {
+                                toogleLoader('no-show');
+                                setTimeout(() => {
+                                    window.location.href = "{{ url_for('logs') }}";
+                                }, 700);
+                            }, 3000);
                 } else {
                     if (response.status !== 500) {
                         const responseData = await response.json();
