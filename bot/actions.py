@@ -384,7 +384,8 @@ class Creator:
                         'https://api.maloum.com/chats',
                         json={'member2': user.get('_id')},
                         proxy=proxy,
-                        timeout=20
+                        timeout=20,
+                        ssl=False
                     ) as response:
                         if not response.ok:
                             Utils.write_log(f"--- Failed to create chat for user {user['username']}: {await response.text()} ---")
@@ -488,7 +489,6 @@ class Creator:
 
     async def login(self, admin, email, password, reuse_ip=True, task_id=None, category='creators'):
         async with aiohttp.ClientSession() as session:
-            proxy = self.format_proxy(random.choice(self.proxies))
             try:
                 success, task_status = Utils.check_task_status(task_id) if task_id else (False, 'No task ID provided')
                 if not success:
@@ -497,30 +497,58 @@ class Creator:
                     return False, 'Task canceled'
 
                 success, user = Utils.check_creator(email, admin)
-                if not success:
-                    raise Exception(user)
+                if not success:raise Exception(user)
 
-                creator_id = user.get('id')
+                creator_id = user.get('id',None)
                 user_data = user.get('data', {})
-                new_user = not (user_data.get('cookies') and user_data.get('headers'))
+                new_user = creator_id is None
 
                 if reuse_ip and 'proxies' in user_data:
                     proxy = user_data['proxies']
+                else:proxy = self.format_proxy(random.choice(self.proxies))
 
                 if not new_user:
-                    async with session.get(
-                        'https://api.maloum.com/users/current',
-                        headers=user_data.get('headers', {}),
+                    session.headers.update(user_data.get('headers', {}))
+                    refresh_token = user_data['details']['user']['refreshToken']
+                    del session.headers['authorization']
+
+                    #refresh token
+                    async with session.post(
+                        'https://srswgacczfgjttwdpuia.supabase.co/auth/v1/token',
+                        params={'grant_type': 'refresh_token'},
+                        json={'refresh_token': refresh_token},
                         proxy=proxy,
-                        timeout=20
+                        timeout=60
                     ) as response:
-                        if response.ok:
-                            user_data['id'] = creator_id
-                            user_data['status'] = 'Online'
-                            return True, user_data
+                        if not response.ok:raise Exception(f'could not refresh access token with refresh token {refresh_token}')
+                        login_data = await response.json()
+                        token, refresh_token = login_data['access_token'], login_data['refresh_token']
+
+                        session.headers.update({
+                            'authorization': f'Bearer {token}'
+                        })
+
+                        user_data['details']['user'].update({
+                            'accessToken':token,
+                            'refreshToken':refresh_token,
+                        })
+                        user_data.update({
+                            'headers':dict(session.headers),
+                            'proxies':proxy
+                        })
+
+                        user_data['cookies'] = {
+                            key: str(value) for key, value in session.cookie_jar.filter_cookies('https://api.maloum.com').items()
+                        }
+
+                        success, msg = Utils.update_creator(creator_id, email, user_data)
+                        if not success:raise Exception(msg)
+                        return True, user_data
+
 
                 session.headers.update(self.headers)
                 session.headers.update({'user-agent': Utils.generate_user_agent('android', 1)})
+                
                 async with session.post(
                     'https://api.maloum.com/user-management/login',
                     json={'usernameOrEmail': email, 'password': password},
@@ -580,6 +608,7 @@ class Creator:
                             **login_data
                         }
                     }
+
                     user_data['status'] = 'Online' if data['user'].get('status') == 'authenticated' else 'Offline'
                     user_data['details'] = data
                     user_data['details']['user']['password'] = password
@@ -599,8 +628,8 @@ class Creator:
                             file.write("")
                     else:
                         success, msg = Utils.update_creator(creator_id, email, user_data)
-                    if not success:
-                        raise Exception(msg)
+                        if not success:
+                            raise Exception(msg)
 
                     user_data['id'] = creator_id
                     return True, user_data
