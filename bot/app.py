@@ -239,6 +239,9 @@ def creators():
 def handle_creators(action):
     try:
         if action == 'add':
+            if len(Utils.load_proxies()) < 1:
+                return jsonify({'msg': 'Proxies must not be empty'}), 400
+            
             admin = session['USER']['id']
 
             creators = request.form.get('configs', '')
