@@ -23,6 +23,7 @@ def handle_connect():
 @app.before_request
 def before_request():
     g.host = host
+    g.app_prefix = app_prefix
 
 @app.after_request
 def after_request(response):
