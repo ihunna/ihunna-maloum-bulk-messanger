@@ -351,7 +351,8 @@ class Creator:
             if not success:
                 raise Exception(_creator)
             creator = _creator
-
+            
+            if len(scrapers) < 1: raise Exception('Scrapers must not be empty')
             target_scraper = random.choice(scrapers)
             success, scraper = await self.login(
                 admin, target_scraper['email'], target_scraper['data']['details']['user']['password'],
