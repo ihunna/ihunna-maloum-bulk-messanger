@@ -336,6 +336,15 @@ class Creator:
             is_paid = False if config.get('cost_type', 'free') == 'free' else True
             price = config.get('price', 0)
 
+            if caption_source == 'creator':
+                captions_file = os.path.join(configs_folder, creator_internal_id, 'captions.txt')
+                if not os.path.isfile(captions_file):
+                    raise Exception(f'Captions file does not exist for {creator_name}')
+                with open(captions_file, 'r', encoding='utf-8') as f:
+                    captions = [line.strip() for line in f.readlines()]
+                    if not captions:
+                        raise ValueError('Captions cannot be empty')
+
             success, _creator = await self.login(
                 admin, email, password, reuse_ip=creator.get('reuse_ip', True), task_id=task_id
             )
@@ -350,15 +359,6 @@ class Creator:
             )
             if not success:
                 raise Exception(scraper)
-
-            if caption_source == 'creator':
-                captions_file = os.path.join(configs_folder, creator_internal_id, 'captions.txt')
-                if not os.path.isfile(captions_file):
-                    raise Exception(f'Captions file does not exist for {creator_name}')
-                with open(captions_file, 'r', encoding='utf-8') as f:
-                    captions = [line.strip() for line in f.readlines()]
-                    if not captions:
-                        raise ValueError('Captions cannot be empty')
 
             async with aiohttp.ClientSession() as session:
                 session.headers.update(creator_data.get('headers'))
@@ -418,7 +418,8 @@ class Creator:
                                 continue
 
                         # Prepare message
-                        caption = random.choice(captions)
+                        caption = random.choice(captions) if caption_source == 'creator' else caption
+
                         json_data = {'type': 'text', 'text': caption}
                         if has_media and media_id:
                             media_info = {

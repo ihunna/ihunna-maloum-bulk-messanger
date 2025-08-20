@@ -57,12 +57,13 @@ load_dotenv(env_path)
 session_key = os.getenv('SECRET_KEY')
 server_key = os.getenv('SERVER_KEY')
 host = os.getenv('HOST')
+app_prefix = os.getenv('APP_PREFIX')
 
 # Configure application
 app = Flask(__name__)
 app.debug = True
 CORS(app,origins=host)
-socketio = SocketIO(app)
+socketio = SocketIO(app, path=f'{app_prefix}/socket.io')
 
 # Ensure templates are auto-reloaded
 app.config["TEMPLATES_AUTO_RELOAD"] = True
