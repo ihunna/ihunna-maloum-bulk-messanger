@@ -113,10 +113,10 @@
                             </div>
                             <div class="table-cell badge">
                                 <span class="bg-success">
-                                    {{creator_details.name|capitalize}}
+                                     {{creator_details.username|capitalize}}
                                 </span>
                             </div>
-                            <div class="table-cell double-cell">{{creator_details.last_login}}</div>                             
+                            <div class="table-cell double-cell">{{creator_details.last_login | datetime}}</div>                             
                             <div class="table-cell double-cell">{{ creator.created_at}}</div>
                             <div class="table-cell actions">
                                 <ul class="actions-list">
