@@ -127,12 +127,6 @@
                                         onclick="handleAction(this,'tasks-table','single')">
                                             <i class="fas fa-trash text-danger"></i>
                                         </li>
-                                        <li data-action="delete" data-action-url="{{ url_for('delete', category='tasks') }}" 
-                                        data-action-message="Deleting Task {{task.id}}"
-                                        data-item="{{task.id}}" data-action-target="{{task.creator}}"
-                                        onclick="handleAction(this,'tasks-table','single')">
-                                            <i class="fas fa-trash text-danger"></i>
-                                        </li>
                                         {%if task.status|lower in ['running','pending','posting','liking','commenting']%}
                                             <li data-action="stop" data-action-url="{{ url_for('update_task', action='stop') }}" 
                                                 data-action-message="Stopping Task {{task.id}}"
