@@ -15,7 +15,7 @@ class Cancelled(Exception):
 
 class AsyncChatClient:
     def __init__(self, ws_url, auth_token, session, timeout=30):
-        self.sio = socketio.AsyncClient(logger=False)
+        self.sio = socketio.AsyncClient(logger=True, engineio_logger = True)
         self.ws_url = ws_url
         self.auth_token = auth_token
         self.session = session
