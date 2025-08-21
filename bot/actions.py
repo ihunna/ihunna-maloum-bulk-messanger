@@ -88,7 +88,9 @@ class AsyncChatClient:
         await self._fail_and_disconnect(data, reason="Socket¹¹Socket error")
 
     async def _on_connect_error(self, data):
-        Utils.write_log(f"⚠️ Connect error: {data}")
+        Utils.write_log(f"⚠️ Connect error: {data!r} (type={type(data)})")
+        if isinstance(data, Exception):
+            Utils.write_log(f"Exception details: {str(data)}")
         await self._fail_and_disconnect(data, reason="Connect error")
 
     async def _on_disconnect(self):
@@ -109,6 +111,7 @@ class AsyncChatClient:
             )
             await self.sio.wait()
         except Exception as e:
+            Utils.write_log(f"❌ Exception during connect: {repr(e)}")
             return False, str(e)
 
         return self.result
