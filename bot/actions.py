@@ -91,6 +91,7 @@ class AsyncChatClient:
         Utils.write_log(f"⚠️ Connect error: {data!r} (type={type(data)})")
         if isinstance(data, Exception):
             Utils.write_log(f"Exception details: {str(data)}")
+        else:Utils.write_log(data)
         await self._fail_and_disconnect(data, reason="Connect error")
 
     async def _on_disconnect(self):
