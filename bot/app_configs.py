@@ -63,7 +63,7 @@ app_prefix = os.getenv('APP_PREFIX')
 app = Flask(__name__)
 app.debug = True
 CORS(app,origins=host)
-socketio = SocketIO(app)
+socketio = SocketIO(app, path=f'{app_prefix}/socket.io')
 
 # Ensure templates are auto-reloaded
 app.config["TEMPLATES_AUTO_RELOAD"] = True

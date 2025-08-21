@@ -32,7 +32,13 @@ class AsyncChatClient:
         self.sio.on("connect_error", self._on_connect_error, namespace="/chat")
         self.sio.on("disconnect", self._on_disconnect, namespace="/chat")
 
+
     async def _on_connect(self):
+         # Print engineio internals
+        eio = self.sio.eio
+        Utils.write_log(f"🔍 Transport: {eio.transport}")
+        Utils.write_log(f"🔍 SID: {eio.sid}")
+        Utils.write_log(f"🔍 Connection URL: {self.ws_url}")
         Utils.write_log("✅ Connected. Checking authentication...")
         await self.sio.emit("authenticate", "ack", namespace="/chat", callback=self._on_auth)
 
