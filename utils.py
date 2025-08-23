@@ -38,6 +38,17 @@ class Utils:
     @staticmethod
     def get_proxy_cert(proxy_cert):
         return os.path.join(root_dir,proxy_cert)
+    
+    @staticmethod
+    def format_proxy(proxies):
+        if isinstance(proxies,dict):
+            return proxies['http']
+        elif isinstance(proxies,str) and 'http://' in proxies:
+            return {
+                'http':proxies,
+                'https':proxies
+            }
+        return None
 
     @staticmethod
     def generate_android_version():
@@ -352,37 +363,7 @@ class Utils:
         try:
             category = {'users':'user','creators':'creator','creator':'creator'}[category]
             
-            if exclude_from_posts is not None:  # Ensure it's not empty
-                placeholders = ','.join('?' * len(exclude_from_posts))  # Create (?, ?, ?) dynamically
-                Utils.write_log(f'Exclude from posts {placeholders}')
-                query = f"""
-                    SELECT COUNT(*) 
-                    FROM creators 
-                    WHERE id NOT IN ({placeholders}) 
-                    AND admin = ? 
-                    AND category = ?
-                """
-                cursor.execute(query, (*exclude_from_posts, admin, category))  # Unpack list into query
-                total_creators = cursor.fetchone()[0]
-
-                query = f"""
-                    SELECT * 
-                    FROM creators 
-                    WHERE id NOT IN ({placeholders}) 
-                    AND admin = ? AND category = ?
-                    ORDER BY created_at DESC 
-                    LIMIT ? OFFSET ?
-                """
-                cursor.execute(query, (*exclude_from_posts, admin, category, limit, offset))
-                rows = cursor.fetchall()
-
-                creators = [{
-                    'id': row[0], 
-                    'email': row[1],
-                    'data': json.loads(row[2]),
-                    'created_at': row[6]
-                } for row in rows]
-            elif selected_creators:  # Check if selected_creators is not empty
+            if selected_creators:  # Check if selected_creators is not empty
                 placeholders = ','.join('?' for _ in selected_creators)  # Create placeholders for the IN clause
                 cursor.execute(
                     f"SELECT COUNT(*) FROM creators WHERE id IN ({placeholders}) AND admin = ?",

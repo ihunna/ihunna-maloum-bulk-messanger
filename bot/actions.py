@@ -1,25 +1,30 @@
-# -*- coding: utf-8 -*-
-
 from app_configs import creators_file,configs_folder,universal_files
 from utils import Utils
 from configs import *
-import io, threading, socketio, asyncio, aiohttp
+import io, threading, socketio, asyncio, aiohttp, ssl, functools
+from aiohttp import ClientSession, TCPConnector
 
 Lock = threading.Lock()
-
 
 # Define a custom exception
 class Cancelled(Exception):
     """Custom exception for specific error handling."""
     pass
 
-class AsyncChatClient:
-    def __init__(self, ws_url, auth_token, session, timeout=30):
-        self.sio = socketio.AsyncClient(logger=True, engineio_logger = True)
+class ChatClient:
+    def __init__(self, ws_url, auth_token, proxies, timeout=30):
+        session = requests.Session()
+        session.proxies = Utils.format_proxy(proxies)
+        session.verify = False
+
+        self.sio = socketio.Client(
+            http_session=session
+        )
+        
         self.ws_url = ws_url
         self.auth_token = auth_token
-        self.session = session
         self.timeout = timeout
+
         self.result = None
         self.temp_ack = None
         self._timer = None
@@ -27,25 +32,19 @@ class AsyncChatClient:
         # Handlers
         self.sio.on("connect", self._on_connect, namespace="/chat")
         self.sio.on("receive_message", self._on_receive, namespace="/chat")
-        self.sio.on("message", self._on_any_message, namespace="/chat")
+        self.sio.on("message", self._on_any_message, namespace="/chat")   # catch raw JSON error packets
         self.sio.on("error", self._on_error, namespace="/chat")
         self.sio.on("connect_error", self._on_connect_error, namespace="/chat")
         self.sio.on("disconnect", self._on_disconnect, namespace="/chat")
 
-
-    async def _on_connect(self):
-         # Print engineio internals
-        eio = self.sio.eio
-        Utils.write_log(f"🔍 Transport: {eio.transport}")
-        Utils.write_log(f"🔍 SID: {eio.sid}")
-        Utils.write_log(f"🔍 Connection URL: {self.ws_url}")
+    def _on_connect(self):
         Utils.write_log("✅ Connected. Checking authentication...")
-        await self.sio.emit("authenticate", "ack", namespace="/chat", callback=self._on_auth)
+        self.sio.emit("authenticate", "ack", namespace="/chat", callback=self._on_auth)
 
-    async def _on_auth(self, resp):
-        Utils.write_log(f"🔑 Auth response: {resp}")
+    def _on_auth(self, resp):
+        Utils.write_log(f"🔑 Auth response: { resp}")
         if self._has_error(resp):
-            await self._fail_and_disconnect(resp, reason="Auth error (callback)")
+            self._fail_and_disconnect(resp, reason="Auth error (callback)")
             return
 
         optimistic_id = str(uuid.uuid4())
@@ -56,26 +55,31 @@ class AsyncChatClient:
         }
 
         Utils.write_log("📤 Sending message...")
-        await self.sio.emit("send_message", payload, namespace="/chat", callback=self._on_send)
+        self.sio.emit("send_message", payload, namespace="/chat", callback=self._on_send)
 
-    async def _on_send(self, resp):
+    def _on_send(self, resp):
         Utils.write_log(f"📩 Send ACK: {resp}")
+
         if self._has_error(resp):
-            await self._fail_and_disconnect(resp, reason="Send error")
+            self._fail_and_disconnect(resp, reason="Send error")
             return
         self.temp_ack = resp
-        self._start_timeout()
 
-    async def _on_receive(self, data):
+        # Consider message sent successfully, set result and disconnect
+        self.result = (True, {"ack": self.temp_ack})
+        self.sio.disconnect()
+
+    def _on_receive(self, data):
         Utils.write_log("📨 Final receive_message: waiting for message confirmation")
         self._cancel_timeout()
         if self._has_error(data):
-            await self._fail_and_disconnect(data, reason="Receive error")
+            self._fail_and_disconnect(data, reason="Receive error")
         else:
             self.result = (True, {"ack": self.temp_ack, "receive": data})
-            await self.sio.disconnect()
+            self.sio.disconnect()
 
-    async def _on_any_message(self, data):
+    def _on_any_message(self, data):
+        """Catch stray messages like Unauthorized JSON strings"""
         Utils.write_log(f"📡 Raw message received: {data}")
         parsed = None
         if isinstance(data, str):
@@ -87,48 +91,43 @@ class AsyncChatClient:
             parsed = data
 
         if parsed and self._has_error(parsed):
-            await self._fail_and_disconnect(parsed, reason="Auth error (raw msg)")
+            self._fail_and_disconnect(parsed, reason="Auth error (raw msg)")
 
-    async def _on_error(self, data):
-        Utils.write_log(f"⚠️ Socket error: {data}")
-        await self._fail_and_disconnect(data, reason="Socket¹¹Socket error")
+    def _on_error(self, data):
+        Utils.write_log(f"⚠️ Socket error: { data}")
+        self._fail_and_disconnect(data, reason="Socket error")
 
-    async def _on_connect_error(self, data):
-        Utils.write_log(f"⚠️ Connect error: {data!r} (type={type(data)})")
-        if isinstance(data, Exception):
-            Utils.write_log(f"Exception details: {str(data)}")
-        else:Utils.write_log(data)
-        await self._fail_and_disconnect(data, reason="Connect error")
+    def _on_connect_error(self, data):
+        Utils.write_log(f"⚠️ Connect error: { data}")
+        self._fail_and_disconnect(data, reason="Connect error")
 
-    async def _on_disconnect(self):
+    def _on_disconnect(self):
         Utils.write_log("🔌 Disconnected.")
 
-    async def send_message(self, chat_id, content):
+    def send_message(self, chat_id, content):
+        """One-shot flow: connect → authenticate → send → receive → disconnect"""
         self.pending_chat = chat_id
         self.pending_content = content
         self.result = None
         self.temp_ack = None
 
-        Utils.write_log(self.auth_token)
-
         try:
-            await self.sio.connect(
+            self.sio.connect(
                 self.ws_url,
                 transports=["websocket"],
                 namespaces=["/chat"],
                 auth={"authorization": f"Bearer {self.auth_token}"}
             )
-            await self.sio.wait()
+            self.sio.wait()
         except Exception as e:
-            Utils.write_log(f"❌ Exception during connect: {repr(e)}")
             return False, str(e)
 
         return self.result
 
     def _start_timeout(self):
         self._cancel_timeout()
-        loop = asyncio.get_event_loop()
-        self._timer = loop.call_later(self.timeout, self._on_timeout)
+        self._timer = threading.Timer(self.timeout, self._on_timeout)
+        self._timer.start()
 
     def _cancel_timeout(self):
         if self._timer:
@@ -138,16 +137,17 @@ class AsyncChatClient:
     def _on_timeout(self):
         Utils.write_log(f"⏳ Timeout: No receive_message after {self.timeout}s")
         self.result = (False, "timeout")
-        asyncio.create_task(self.sio.disconnect())
+        self.sio.disconnect()
 
-    async def _fail_and_disconnect(self, resp, reason="Error"):
+    def _fail_and_disconnect(self, resp, reason="Error"):
         Utils.write_log(f"⛔ {reason}, disconnecting...")
         self.result = (False, resp)
         self._cancel_timeout()
-        await self.sio.disconnect()
+        self.sio.disconnect()
 
     @staticmethod
     def _has_error(resp):
+        """Treat any response containing 'error' or statusCode != 200 as failure"""
         if resp is None:
             return True
         if isinstance(resp, dict):
@@ -158,6 +158,8 @@ class AsyncChatClient:
         if isinstance(resp, str) and "Unauthorized" in resp:
             return True
         return False
+
+
 
 class Creator:
     def __init__(self):
@@ -190,11 +192,11 @@ class Creator:
     async def update_media_id(self, post_id, creator, creator_id):
         async with aiohttp.ClientSession(headers=creator.get('data', {}).get('headers')) as session:
             session.headers.update({'user-agent': Utils.generate_user_agent('android', 1)})
-            proxy = self.format_proxy(random.choice(self.proxies)) if not creator.get('reuse_ip') else creator.get('proxies')
+            proxies = Utils.format_proxy(random.choice(self.proxies)) if not creator.get('reuse_ip') else creator.get('proxies')
             try:
                 async with session.get(
                     f'https://api.maloum.com/posts/{post_id}',
-                    proxy=proxy,
+                    proxy=proxies,
                     timeout=20
                 ) as response:
                     if not response.ok:
@@ -237,12 +239,12 @@ class Creator:
 
             async with aiohttp.ClientSession(headers=scraper.get('headers')) as session:
                 session.cookie_jar.update_cookies(scraper.get('cookies'))
-                proxy = scraper.get('proxies', self.format_proxy(random.choice(self.proxies))) if scraper.get('reuse_ip', True) else self.format_proxy(random.choice(self.proxies))
+                proxies = scraper.get('proxies', Utils.format_proxy(random.choice(self.proxies))) if scraper.get('reuse_ip', True) else Utils.format_proxy(random.choice(self.proxies))
 
                 async with session.get(
                     'https://api.maloum.com/content/discovery',
                     params={'limit': limit, 'next': offset, 'dsc_r': self.generate_sensor_data('dsc_r')},
-                    proxy=proxy,
+                    proxy=proxies,
                     timeout=20
                 ) as response:
                     if not response.ok:
@@ -275,7 +277,7 @@ class Creator:
                             async with session.get(
                                 f'https://api.maloum.com/posts/{post_id}/comments',
                                 params=params,
-                                proxy=proxy,
+                                proxy=proxies,
                                 timeout=20
                             ) as response:
                                 if not response.ok: raise Exception(f'could not get comment for post | {post_id} | {await response.text}')
@@ -329,14 +331,20 @@ class Creator:
             
             message_batch = []
 
-            creator_data = creator.get('data', {})
-            if not creator_data:
-                raise Exception('No creator data')
+            if not creator.get('data', {}):raise Exception(f'creator data not available')
+
+            email = creator['data']['details']['user']['email']
+            password = creator['data']['details']['user']['password']
+
+            success, _creator = await self.login(
+                admin, email, password, reuse_ip=creator.get('reuse_ip', True), task_id=task_id
+            )
+
+            if not success:raise Exception(_creator)
+            creator_data = _creator
 
             auth_token = creator_data['details']['user']['accessToken']
             creator_name = creator_data['details']['user']['username']
-            email = creator_data['details']['user']['email']
-            password = creator_data['details']['user']['password']
             creator_id = creator_data['details']['user']['_id']
             creator_internal_id = creator['id']
 
@@ -356,13 +364,6 @@ class Creator:
                     captions = [line.strip() for line in f.readlines()]
                     if not captions:
                         raise ValueError('Captions cannot be empty')
-
-            success, _creator = await self.login(
-                admin, email, password, reuse_ip=creator.get('reuse_ip', True), task_id=task_id
-            )
-            if not success:
-                raise Exception(_creator)
-            creator = _creator
             
             if len(scrapers) < 1: raise Exception('Scrapers must not be empty')
             target_scraper = random.choice(scrapers)
@@ -376,12 +377,12 @@ class Creator:
             async with aiohttp.ClientSession() as session:
                 session.headers.update(creator_data.get('headers'))
                 session.cookie_jar.update_cookies(creator_data.get('cookies'))
-                proxy = creator.get('proxies', self.format_proxy(random.choice(self.proxies))) if creator.get('reuse_ip', True) else self.format_proxy(random.choice(self.proxies))
+                proxies = creator.get('proxies', Utils.format_proxy(random.choice(self.proxies))) if creator.get('reuse_ip', True) else Utils.format_proxy(random.choice(self.proxies))
 
                 offset, limit, users, found_users = 0, 50, [], 0
                 while found_users < max_actions:
                     success, new_users = await self.scrape_users(
-                        scraper, admin, creator_id, task_id, count=max_actions, limit=limit, offset=offset
+                        scraper, admin, creator_internal_id, task_id, count=max_actions, limit=limit, offset=offset
                     )
                     if not success:
                         raise Exception(new_users)
@@ -396,9 +397,8 @@ class Creator:
                     async with session.post(
                         'https://api.maloum.com/chats',
                         json={'member2': user.get('_id')},
-                        proxy=proxy,
-                        timeout=20,
-                        ssl=False
+                        proxy=proxies,
+                        timeout=20
                     ) as response:
                         if not response.ok:
                             Utils.write_log(f"--- Failed to create chat for user {user['username']}: {await response.text()} ---")
@@ -417,7 +417,7 @@ class Creator:
                         async with session.get(
                             f'https://api.maloum.com/chats/{chat_id}/messages',
                             params={'limit': 1},
-                            proxy=proxy,
+                            proxy=proxies,
                             timeout=20
                         ) as response:
                             if not response.ok:
@@ -453,10 +453,16 @@ class Creator:
                         await asyncio.sleep(random.randint(2, 5))
 
                         # Send message
-                        client = AsyncChatClient('wss://api.maloum.com/socket.io', auth_token, session)
-                        task = client.send_message(chat_id, json_data)
-                        message_tasks.append((task, user, chat_id, caption))  # Store task, user, chat_id, and caption
+                        client = ChatClient('wss://ws.maloum.com/socket.io', auth_token, proxies)
+                        async def send_message_task(client, chat_id, json_data):
+                            loop = asyncio.get_event_loop()
+                            with ThreadPoolExecutor() as executor:
+                                return await loop.run_in_executor(executor, lambda: client.send_message(chat_id, json_data))
 
+                        # Append async task to message_tasks
+                        task = send_message_task(client, chat_id, json_data)
+                        message_tasks.append((task, user, chat_id, caption))
+                        
                 # Process message tasks
                 results = await asyncio.gather(*(task for task, _, _, _ in message_tasks), return_exceptions=True)
 
@@ -518,12 +524,14 @@ class Creator:
                 new_user = creator_id is None
 
                 if reuse_ip and 'proxies' in user_data:
-                    proxy = user_data['proxies']
-                else:proxy = self.format_proxy(random.choice(self.proxies))
+                    proxies = user_data['proxies']
+                else:proxies = Utils.format_proxy(random.choice(self.proxies))
 
                 if not new_user:
                     session.headers.update(user_data.get('headers', {}))
                     refresh_token = user_data['details']['user']['refreshToken']
+                    token = user_data['details']['user']['accessToken']
+                    if category=='creators':Utils.write_log(f'token before refresh {token}')
                     del session.headers['authorization']
 
                     #refresh token
@@ -531,13 +539,14 @@ class Creator:
                         'https://srswgacczfgjttwdpuia.supabase.co/auth/v1/token',
                         params={'grant_type': 'refresh_token'},
                         json={'refresh_token': refresh_token},
-                        proxy=proxy,
+                        proxy=proxies,
                         timeout=60
                     ) as response:
                         if not response.ok:raise Exception(f'could not refresh access token with refresh token {refresh_token}')
                         login_data = await response.json()
                         token, refresh_token = login_data['access_token'], login_data['refresh_token']
-
+                        if category == 'creators':Utils.write_log(f'token after refresh {token}')
+                        
                         session.headers.update({
                             'authorization': f'Bearer {token}'
                         })
@@ -545,10 +554,11 @@ class Creator:
                         user_data['details']['user'].update({
                             'accessToken':token,
                             'refreshToken':refresh_token,
+                            'last_login':login_data.get('user',{}).get('last_sign_in_at')
                         })
                         user_data.update({
                             'headers':dict(session.headers),
-                            'proxies':proxy
+                            'proxies':proxies
                         })
 
                         user_data['cookies'] = {
@@ -557,6 +567,8 @@ class Creator:
 
                         success, msg = Utils.update_creator(creator_id, email, user_data)
                         if not success:raise Exception(msg)
+                        session.close()
+                        user_data['id'] = creator_id
                         return True, user_data
 
 
@@ -566,7 +578,7 @@ class Creator:
                 async with session.post(
                     'https://api.maloum.com/user-management/login',
                     json={'usernameOrEmail': email, 'password': password},
-                    proxy=proxy,
+                    proxy=proxies,
                     timeout=20
                 ) as response:
                     if response.status == 401:
@@ -586,7 +598,7 @@ class Creator:
 
                     async with session.get(
                         'https://srswgacczfgjttwdpuia.supabase.co/auth/v1/user',
-                        proxy=proxy,
+                        proxy=proxies,
                         timeout=20
                     ) as response:
                         if not response.ok:
@@ -595,7 +607,7 @@ class Creator:
 
                     async with session.get(
                         'https://api.maloum.com/users/current',
-                        proxy=proxy,
+                        proxy=proxies,
                         timeout=20
                     ) as response:
                         if not response.ok:
@@ -606,7 +618,7 @@ class Creator:
                     if category == 'creators':
                         async with session.get(
                             f'https://api.maloum.com/users/{account["username"]}/profile',
-                            proxy=proxy,
+                            proxy=proxies,
                             timeout=20
                         ) as response:
                             if not response.ok:
@@ -630,7 +642,7 @@ class Creator:
                     user_data['cookies'] = {
                         key: str(value) for key, value in session.cookie_jar.filter_cookies('https://api.maloum.com').items()
                     }
-                    user_data['proxies'] = proxy
+                    user_data['proxies'] = proxies
                     user_data['reuse_ip'] = reuse_ip
 
                     if new_user:
@@ -646,6 +658,7 @@ class Creator:
                             raise Exception(msg)
 
                     user_data['id'] = creator_id
+                    session.close()
                     return True, user_data
 
             except Exception as e:
@@ -766,7 +779,7 @@ class _MALOUM:
             admin = task['admin']
             task_id = task['id']
             config = task['config']
-            selected_creators = config.get('select-creators', [])
+            selected_creators = config.get('selected_creators', [])
             time_between = config.get('time_between', 60)
             time_message = {
                 '60': '1 minute', '120': '2 minutes', '180': '3 minutes', '300': '5 minutes',

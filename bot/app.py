@@ -524,7 +524,7 @@ def handle_messages():
             })
             if not success:Utils.write_log(msg)
             
-            success,msg = Utils.update_client({'msg':f'{task_id} successfully created','status':'success','type':'message'})
+            success,msg = Utils.update_client({'msg':f'Task {task_id} successfully created','status':'success','type':'message'})
             if not success:Utils.write_log(msg)
             
             else:
@@ -609,15 +609,13 @@ def update_task(action):
                     'status': 'success',
                     'type': 'message'
                 })
-                if not success:
-                    raise Exception(msg)
+                if not success:raise Exception(msg)
 
                 task_msg = task
                 task_msg.update({'updated': str(datetime.now())})
 
                 success, msg = Utils.update_client({'task': task_msg, 'type': 'task'})
-                if not success:
-                    raise Exception(msg)
+                if not success:raise Exception(msg)
 
                 Utils.write_log(msg)
                 return jsonify({'msg': f'Stopping task {task_id}, it might take a while.'})
