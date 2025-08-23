@@ -413,27 +413,31 @@ class Creator:
                             Utils.write_log(f"--- No chat ID found for user {user.get('_id')} ---")
                             continue
 
-                        # Check for existing messages in the chat
-                        async with session.get(
-                            f'https://api.maloum.com/chats/{chat_id}/messages',
-                            params={'limit': 1},
-                            proxy=proxies,
-                            timeout=20
-                        ) as response:
-                            if not response.ok:
-                                Utils.write_log(f"--- Failed to check messages for chat {chat_id}: {await response.text()} ---")
-                                continue
-                            messages = (await response.json()).get('data', [])
-                            if len(messages) > 0:
-                                client_msg = {'msg': f'Skipping chat with user @{user["username"]} by {creator_name} as it already has messages', 'status': 'success', 'type': 'message'}
-                                success,msg = Utils.update_client(client_msg)
-                                Utils.write_log(f"--- Skipping chat with user @{user["username"]} by {creator_name} as it already has messages ---")
-                                continue
+                        # # Check for existing messages in the chat
+                        # async with session.get(
+                        #     f'https://api.maloum.com/chats/{chat_id}/messages',
+                        #     params={'limit': 1},
+                        #     proxy=proxies,
+                        #     timeout=20
+                        # ) as response:
+                        #     if not response.ok:
+                        #         Utils.write_log(f"--- Failed to check messages for chat {chat_id}: {await response.text()} ---")
+                        #         continue
+                        #     messages = (await response.json()).get('data', [])
+                        #     if len(messages) > 0:
+                        #         client_msg = {'msg': f'Skipping chat with user @{user["username"]} by {creator_name} as it already has messages', 'status': 'success', 'type': 'message'}
+                        #         success,msg = Utils.update_client(client_msg)
+                        #         Utils.write_log(f"--- Skipping chat with user @{user["username"]} by {creator_name} as it already has messages ---")
+                        #         continue
 
                         # Prepare message
                         caption = random.choice(captions) if caption_source == 'creator' else caption
 
-                        json_data = {'type': 'text', 'text': caption}
+                        content = {
+                            'type': 'text', 
+                            'text': caption
+                        }
+
                         if has_media and media_id:
                             media_info = {
                                 "mediaId": media.get("uploadId"),
@@ -441,54 +445,46 @@ class Creator:
                                 "width": media.get("width"),
                                 "height": media.get("height")
                             }
-                            json_data = {
+                            content = {
                                 "type": "media" if not (is_paid and price > 0) else "chat_product",
                                 "media": [media_info],
                                 "text": caption
                             }
                             if is_paid and price > 0:
-                                json_data["priceNet"] = price
-
+                                content["priceNet"] = price
+                        
+                        json_data = {
+                            'content':content,
+                            'optimisticMessageId':str(uuid.uuid4())
+                        }
                         # Introduce random delay to avoid rate-limiting
                         await asyncio.sleep(random.randint(2, 5))
 
-                        # Send message
-                        client = ChatClient('wss://ws.maloum.com/socket.io', auth_token, proxies)
-                        async def send_message_task(client, chat_id, json_data):
-                            loop = asyncio.get_event_loop()
-                            with ThreadPoolExecutor() as executor:
-                                return await loop.run_in_executor(executor, lambda: client.send_message(chat_id, json_data))
-
-                        # Append async task to message_tasks
-                        task = send_message_task(client, chat_id, json_data)
-                        message_tasks.append((task, user, chat_id, caption))
-                        
-                # Process message tasks
-                results = await asyncio.gather(*(task for task, _, _, _ in message_tasks), return_exceptions=True)
-
-                # Build message batch with per-user data
-                for (task, user, chat_id, caption), result in zip(message_tasks, results):
-                    if isinstance(result, Exception):
-                        raise Exception(f"--- Error sending message to {user['username']}: {result} ---")
-                    success, response = result
-                    
-                    if not success:
-                        raise Exception(f"--- Failed to send message to {user['username']}: {response} ---")
-
-                    # Add to message batch
-                    message_batch.append({
-                        'message_id': chat_id,
-                        'admin': admin,
-                        'creator_id': creator_internal_id,
-                        'creator_name': creator_name,
-                        'recipient_id': user['_id'],
-                        'recipient_name': user['username'],
-                        'has_media': has_media,
-                        'link': f'https://app.maloum.com/chat/{chat_id}',
-                        'sender_status': 'sent',
-                        'caption': caption,
-                        'price': price
-                    })
+                        # Send the message
+                        async with session.post(
+                            f'https://api.maloum.com/chats/{chat_id}/messages',
+                            json=json_data,
+                            proxy=proxies,
+                            timeout=20
+                        ) as response:
+                            if not response.ok:
+                                Utils.write_log(f"--- Failed to send message for chat {chat_id}: {await response.text()} ---")
+                                continue
+                            
+                        # Add to message batch
+                        message_batch.append({
+                            'message_id': chat_id,
+                            'admin': admin,
+                            'creator_id': creator_internal_id,
+                            'creator_name': creator_name,
+                            'recipient_id': user['_id'],
+                            'recipient_name': user['username'],
+                            'has_media': has_media,
+                            'link': f'https://app.maloum.com/chat/{chat_id}',
+                            'sender_status': 'sent',
+                            'caption': caption,
+                            'price': price
+                        })
 
                 # Batch database updates
                 for msg in message_batch:
