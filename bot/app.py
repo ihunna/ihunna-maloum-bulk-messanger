@@ -390,7 +390,7 @@ def messages():
             with open(universal_files['captions'], 'r', encoding='utf-8') as f:
                 captions = [caption for caption in f.readlines() if caption != '\n']
 
-            return render_template('messages.html', action=action, captions=captions, creators=creators)
+            return render_template('add-tasks.html', action=action, captions=captions, creators=creators)
         
         elif action == 'get-items':
             item = request.args.get('item')
@@ -537,6 +537,74 @@ def handle_messages():
 
     except Exception as error:
         Utils.write_log(str(error))
+        abort(500)
+
+
+@app.route('/scraper', methods=['GET','POST'])
+@login_required
+def scraper():
+    try:
+        if request.method == 'GET':
+            g.page = 'scraper'
+            return render_template('add-tasks.html', action='start-scraping')
+        
+        elif request.method == 'POST':
+            admin = session['USER']['id']
+
+            if len(Utils.load_proxies()) < 1:
+                return jsonify({'msg': 'Proxies must not be empty'}), 400
+
+            success, tasks, _ = Utils.get_tasks(admin=admin, constraint='type', keyword='scraper')
+            if not success:raise Exception(tasks)
+            running_task = tasks[0] if len(tasks) > 0 else {'status': None}
+
+            if running_task['status'] in ['running', 'pending']:
+                success, msg = Utils.update_client({
+                    'msg': 'Please wait for the current scraper task to finish or stop it before creating another',
+                    'status': 'error',
+                    'type': 'message'
+                })
+                if not success:Utils.write_log(msg)
+                return jsonify({'msg': 'A scaper task is already running. Please wait until it finishes.'}), 400
+
+            data = request.get_json()
+            scraper_data = {
+                'admin': admin,
+                'time_between': int(data.get('time-between-actions', '3600')),
+                'last_activity': int(data.get('last-activity','7')),
+                'max-actions':int(data.get('max-actions', 10))
+            }
+
+            task_id = str(uuid.uuid4()).upper()[:8]
+            task_data = {
+                'id': task_id,
+                'admin': admin,
+                'status': 'pending',
+                'action_count': data.get('action-count', 1),
+                'type': 'scraper',
+                'message': f'Creating task on {admin}',
+                'config': scraper_data
+            }
+            success, msg = Utils.add_task(task_id, task_data)
+            if not success:
+                raise Exception(msg)
+
+            def run_start_scraping():
+                result = run_async_coroutine(_MALOUM().start_scraping(task_data))
+
+            task = Thread(target=run_start_scraping)
+            task.start()
+                
+            if task.is_alive():
+                success,msg = Utils.update_task(task_id,{
+                    'status':'running',
+                    'message':'Started scraper'
+                })
+       
+
+        else: raise Exception('No method provided')
+    except Exception as error:
+        Utils.write_log(error)
         abort(500)
 
 @app.route('/tasks', methods=['GET'])

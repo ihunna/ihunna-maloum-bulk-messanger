@@ -1,0 +1,372 @@
+{% extends "layout.html"%}
+{% block title %}
+ Messages
+{% endblock %} 
+
+{%block main_content%}
+    
+    <style>
+        .message-holder{
+            border: 1px solid var(--success);
+            border-radius: 5px;
+            width: 85%;
+            margin: auto;
+            padding: 10px 20px;
+        }
+        .message-holder:not(:last-child){
+            margin-top: 50px;
+        }
+        .task-tab{
+            display: flex;
+            padding-bottom: 10px;
+        }
+        .task-tab a{
+            margin-left: auto;
+            background: var(--secondary);
+            padding: 10px;
+            font-size: .8rem;
+            border-radius: 5px;
+        }
+
+        .task-tab a:hover{
+            background: none;
+        }
+
+        .input-container{
+            width: 100%;
+        }
+        .input-container > input:not(:last-child):focus,
+        .input-container > textarea,
+        .input-container > select:focus{
+            background: var(--secondary);
+        }
+
+        .input-container > input:focus + label, 
+        .input-container > input:valid + label,
+        .input-container > textarea:focus + label,
+        .input-container > textarea:valid + label{
+            background: var(--secondary);
+        }
+
+        .message-holder .message-label{
+            padding: 2.5px 5px;
+            background: var(--success);
+            width: fit-content;
+            font-size: 12px;
+            margin: 10px 0px 5px 0px;
+        }
+
+        .more{
+            margin-top: 40px;
+            margin-bottom: 40px;
+            border: none;
+            justify-content: end;
+        }
+        .input-container.more > .add-message{
+            border: 1px solid var(--success);
+            border-radius: 5px;
+            width: fit-content;
+            padding: 2.5px 5px;
+        }
+        form > .input-container{
+            width: 85% !important;
+        }
+        .input-container.date-picker-container{
+            width: fit-content;
+            margin: auto 0;
+        }
+    </style>
+    
+    
+    {%if action == 'start-messaging'%}
+        <section class="add-message">
+            <div class="holder form-holder">
+                    <div class="task-tab">
+                        <a href="{{url_for('scraper')}}">Scraper <i class="fas fa-arrow-right"></i></a>
+                    </div>
+                    <form action="" id="messages-form" data-action="Create message" 
+                        data-action-url="{{ url_for('handle_messages') }}" data-action-message="Creating message..." 
+                        data-next-action-url="{{ url_for('tasks') }}">
+                    <h3 class="form-header">
+                        Fill the form to start operation for all added creators, add more messages if needed.
+                    </h3>
+                    <div class="u-settings input-container">
+                        <div class="input-container flex radio">
+                            <span style="padding: 0; margin: 0 auto 0 0;">
+                                Choose creators source
+                            </span>
+                            <div class="radio-box">
+                                <input type="radio" class="creators" id="select-creators" name="creators-source" value="select-creators">
+                                <label for="select-creators">Use selected creators</label>
+                            </div>
+                            <div class="radio-box">
+                                <input type="radio" class="creators" id="universal-creators" name="creators-source" value="universal" checked>
+                                <label for="universal-creators">Use universal creators</label>
+                            </div>
+                        </div>
+                        <div class="input-container" style="display: none;">
+                            <select name="select-creators" id="select-creators" multiple>
+                                <option value="">Choose creators</option>
+                                {% for creator in creators%}
+                                    <option value="{{creator.id}}">{{creator.data.details.user.email}}</option>
+                                {%endfor%}
+                            </select>
+                        </div>
+                        <div class="input-container">
+                            <select name="time-between-actions" id="time-between-actions" required>
+                                <option value="">Time between actions</option>
+                                <option value="60">1 minute</option>
+                                <option value="120">2 minutes</option>
+                                <option value="180">3 minutes</option>
+                                <option value="300">5 minutes</option>
+                                <option value="600">10 minutes</option>
+                                <option value="1200">20 minutes</option>
+                                <option value="1800">30 minutes</option>
+                                <option value="3600">1 hour</option>
+                                <option value="7200">2 hours</option>
+                                <option value="10800">3 hours</option>
+                                <option value="21600">6 hours</option>
+                                <option value="86400">24 hours</option>
+                            </select>
+                        </div>
+                        <div class="input-container max-actions">
+                            <input type="number" id="max-actions" name="max-actions" value="10" max="50" autofocus tocomplete="delay" required>
+                            <label for="max-actions">Number of messages per interation</label>
+                        </div>
+                        <div class="input-container">
+                        </div>
+                    </div>
+                    <div class="message-holder">
+                        <div class="input-container flex radio">
+                            <span style="padding: 0; margin: 0 auto 0 0;">
+                                Choose the message pricing
+                            </span>
+                            <div class="radio-box">
+                                <input type="radio" class="message-cost" id="message-cost-free" name="message-cost-type" value="free" checked>
+                                <label for="message-cost-free">Free</label>
+                            </div>
+                            <div class="radio-box">
+                                <input type="radio" class="message-cost" id="message-cost-paid" name="message-cost-type" value="paid">
+                                <label for="message-cost-paid">Paid</label>
+                            </div>
+                        </div>
+                        <div class="input-container" style="display:none">
+                            <input type="number" id="message-price" name="message-price" value="0" tocomplete="delay" required>
+                            <label for="message-price">Price</label>
+                        </div>
+                        <div class="input-container flex radio">
+                            <span style="padding: 0; margin: 0 auto 0 0;">
+                                Choose captions source
+                            </span>
+                            <div class="radio-box">
+                                <input type="radio" class="captions" id="message-caption-creator" name="message-caption-source" value="creator">
+                                <label for="message-caption-creator">Use creator's caption</label>
+                            </div>
+                            <div class="radio-box">
+                                <input type="radio" class="captions" id="message-caption-universal" name="message-caption-source" value="universal" checked>
+                                <label for="message-caption-universal">Use universal caption</label>
+                            </div>
+                        </div>
+                        <div class="input-container">
+                            <select name="message-caption" id="message-caption" required>
+                                <option value="">Choose a caption</option>
+                                {% for caption in captions%}
+                                    <option value="{{caption}}">{{caption}}</option>
+                                {%endfor%}
+                            </select>
+                        </div>
+                        <div class="input-container flex radio">
+                            <span style="padding: 0; margin: 0 auto 0 0;">
+                                Use media?
+                            </span>
+                            <div class="radio-box">
+                                <input type="radio" class="use-media" id="use-media-yes" name="use-media" value="yes">
+                                <label for="use-media-yes">Yes</label>
+                            </div>
+                            <div class="radio-box">
+                                <input type="radio" class="use-media" id="use-media-no" name="use-media" value="no" checked>
+                                <label for="use-media-no">No</label>
+                            </div>
+                        </div>
+                        <!-- <div class="input-container" id="media-id-container" style="display: none;">
+                            <input type="text" id="media-id" name="media-id" placeholder="Enter 4based media ID">
+                            <label for="media-id">Media ID</label>
+                        </div> -->
+                    </div>
+                    <div class="input-container flex">
+                        <input type="submit" value="Submit">
+                    </div>
+                </form>
+            </div>
+        </section>
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                // Only a single message is allowed, so no counter or add/remove logic
+                const messageHolder = document.querySelector('.message-holder');
+                updateRadioButtons(messageHolder);
+                // Add event listeners for creators radio buttons outside updateRadioButtons
+                const creatorsRadios = document.querySelectorAll('input.creators[type="radio"]');
+                creatorsRadios.forEach(radio => {
+                    radio.addEventListener('change', function () {
+                        const creatorsSelect = document.querySelector('[name="select-creators"]');
+                        const creatorsSelectHolder = creatorsSelect.parentNode;
+                        if (this.value === 'select-creators') {
+                            creatorsSelect.setAttribute('required','required');
+                            creatorsSelectHolder.style.display = '';
+                        } else {
+                            creatorsSelect.value = '';
+                            creatorsSelect.removeAttribute('required');
+                            creatorsSelectHolder.style.display = 'none';
+                        }
+                    });
+                });
+                // Set initial state on page load
+                const checkedCreatorsRadio = document.querySelector('input.creators[type="radio"]:checked');
+                if (checkedCreatorsRadio) {
+                    const creatorsSelect = document.querySelector('[name="select-creators"]');
+                    const creatorsSelectHolder = creatorsSelect.parentNode;
+                    if (checkedCreatorsRadio.value === 'select-creators') {
+                        creatorsSelect.setAttribute('required','required');
+                        creatorsSelectHolder.style.display = '';
+                    } else {
+                        creatorsSelect.value = '';
+                        creatorsSelect.removeAttribute('required');
+                        creatorsSelectHolder.style.display = 'none';
+                    }
+                }
+                // Media radio toggle logic
+                // const useMediaRadios = document.querySelectorAll('input.use-media[type="radio"]');
+                // const mediaIdContainer = document.getElementById('media-id-container');
+                // useMediaRadios.forEach(radio => {
+                //     radio.addEventListener('change', function () {
+                //         if (this.value === 'yes') {
+                //             mediaIdContainer.style.display = '';
+                //             mediaIdContainer.querySelector('input').setAttribute('required', 'required');
+                //         } else {
+                //             mediaIdContainer.style.display = 'none';
+                //             mediaIdContainer.querySelector('input').removeAttribute('required');
+                //         }
+                //     });
+                // });
+                // Set initial state for media id input
+                // const checkedMediaRadio = document.querySelector('input.use-media[type="radio"]:checked');
+                // if (checkedMediaRadio && checkedMediaRadio.value === 'yes') {
+                //     mediaIdContainer.style.display = '';
+                //     mediaIdContainer.querySelector('input').setAttribute('required', 'required');
+                // } else {
+                //     mediaIdContainer.style.display = 'none';
+                //     mediaIdContainer.querySelector('input').removeAttribute('required');
+                // }
+            });
+
+            function updateRadioButtons(messageHolder) {
+                // Find radio buttons and add event listeners for toggling form fields
+                const radios = messageHolder.querySelectorAll('input[type="radio"]');
+                radios.forEach(radio => {
+                    radio.addEventListener('change', function () {
+                        if (radio.classList.contains('captions')){
+                            const captionSelect = messageHolder.querySelector('[name="message-caption"][id="message-caption"]');
+                            const captionSelectHolder = captionSelect.parentNode;
+                            if (this.value == 'creator'){
+                                captionSelect.value = '';
+                                captionSelect.removeAttribute('required');
+                                captionSelectHolder.style.display = 'none';
+                            }else{
+                                captionSelect.setAttribute('required','required');
+                                captionSelectHolder.style.display = '';
+                                captionSelect.value = '';
+                            }
+                        }else if (radio.classList.contains('creators')){
+                            const creatorsSelect = messageHolder.querySelector('[name="select-creators"]');
+                            const creatorsSelectHolder = creatorsSelect.parentNode;
+                            if (this.value == 'select-creators'){
+                                creatorsSelect.setAttribute('required','required');
+                                creatorsSelectHolder.style.display = '';
+                            }else{
+                                creatorsSelect.value = '';
+                                creatorsSelect.removeAttribute('required');
+                                creatorsSelectHolder.style.display = 'none';
+                            }
+                        }else if(radio.classList.contains('message-cost')){
+                            const priceInput = messageHolder.querySelector('[name="message-price"][id="message-price"]');
+                            const priceInputHolder = priceInput.parentNode;
+                            if (this.value == 'paid'){
+                                priceInput.setAttribute('required', 'required');
+                                priceInput.value = '15';
+                                priceInputHolder.style.display = '';
+                            }else{
+                                priceInput.removeAttribute('required');
+                                priceInput.value = '0';
+                                priceInputHolder.style.display = 'None';
+                            }
+                        }
+                    });
+                });
+                // Set initial state based on checked radio
+                const creatorsRadios = messageHolder.querySelectorAll('input.creators[type="radio"]');
+                creatorsRadios.forEach(radio => {
+                    if (radio.checked) {
+                        const creatorsSelect = messageHolder.querySelector('[name="select-creators"]');
+                        const creatorsSelectHolder = creatorsSelect.parentNode;
+                        if (radio.value == 'select-creators') {
+                            creatorsSelect.setAttribute('required','required');
+                            creatorsSelectHolder.style.display = '';
+                        } else {
+                            creatorsSelect.value = '';
+                            creatorsSelect.removeAttribute('required');
+                            creatorsSelectHolder.style.display = 'none';
+                        }
+                    }
+                });
+            }
+        </script>
+    
+    {%elif action == 'start-scraping'%}
+        <section class="add-scraper">
+            <div class="holder form-holder">
+                    <div class="task-tab">
+                        <a href="{{url_for('scraper')}}">Messanger <i class="fas fa-arrow-right"></i></a>
+                    </div>
+                    <form action="" id="scraper-form" data-action="Scrape accounts" 
+                        data-action-url="{{ url_for('scraper') }}" data-action-message="Staring scraper..." 
+                        data-next-action-url="{{ url_for('tasks') }}">
+                    <h3 class="form-header">
+                        Fill the form to start scraping users.
+                    </h3>
+                    <div class="u-settings input-container">
+                        <div class="input-container">
+                            <select name="time-between-actions" id="time-between-actions" required>
+                                <option value="">Time between actions</option>
+                                <option value="60">1 minute</option>
+                                <option value="120">2 minutes</option>
+                                <option value="180">3 minutes</option>
+                                <option value="300">5 minutes</option>
+                                <option value="600">10 minutes</option>
+                                <option value="1200">20 minutes</option>
+                                <option value="1800">30 minutes</option>
+                                <option value="3600">1 hour</option>
+                                <option value="7200">2 hours</option>
+                                <option value="10800">3 hours</option>
+                                <option value="21600">6 hours</option>
+                                <option value="86400">24 hours</option>
+                            </select>
+                        </div>
+                        <div class="input-container max-actions">
+                            <input type="number" id="max-actions" name="max-actions" value="10" max="50" autofocus tocomplete="delay" required>
+                            <label for="max-actions">Number of account per interation</label>
+                        </div>
+                         <div class="input-container last-activity">
+                            <input type="number" id="last-activity" name="last-activity" value="7" max="30" autofocus tocomplete="delay" required>
+                            <label for="last-activity">Number of days since user's comment</label>
+                        </div>
+                        <div class="input-container">
+                        </div>
+                    </div>
+                    <div class="input-container flex">
+                        <input type="submit" value="Submit">
+                    </div>
+                </form>
+            </div>
+        </section>
+    {%endif%}
+{%endblock%}
