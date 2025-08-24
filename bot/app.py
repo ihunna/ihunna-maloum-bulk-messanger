@@ -549,6 +549,7 @@ def scraper():
             return render_template('add-tasks.html', action='start-scraping')
         
         elif request.method == 'POST':
+            return jsonify({'msg': 'Not in commission'}), 400
             admin = session['USER']['id']
 
             if len(Utils.load_proxies()) < 1:
