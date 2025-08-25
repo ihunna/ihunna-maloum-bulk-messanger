@@ -573,7 +573,7 @@ def scraper():
                 'admin': admin,
                 'time_between': int(data.get('time-between-actions', '3600')),
                 'last_activity': int(data.get('last-activity','7')),
-                'max-actions':int(data.get('max-actions', 10))
+                'max_actions':int(data.get('max-actions', 10))
             }
 
             task_id = str(uuid.uuid4()).upper()[:8]

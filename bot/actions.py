@@ -214,7 +214,7 @@ class Creator:
             except Exception as e:
                 return False, f'Error saving media ID {post_id} for creator {creator_id}: {str(e)}'
 
-    async def scrape_users(self, scraper, admin, creator_id, task_id, count=50, limit=50, offset=0):
+    async def scrape_users(self, scraper, admin, creator_id, task_id, count=50, limit=50, offset=0, last_activity=7):
         try:
             success, task_status = Utils.check_task_status(task_id)
             if not success:
@@ -289,7 +289,10 @@ class Creator:
                                     user = comment.get('user')
                                     if not user: continue
                                     
-                                    if (Utils.compare_date(comment.get('createdAt')) and not user.get('isCreator', True)):
+                                    if (
+                                        Utils.compare_date(comment.get('createdAt'), days_ago=last_activity) 
+                                        and not user.get('isCreator', True)
+                                        ):
                                         
                                         async with lock:
                                             if len(valid_users) >= count:
@@ -297,7 +300,11 @@ class Creator:
                                             
                                             if user['_id'] not in seen_users:
                                                 seen_users.add(user['_id'])
-                                                valid_users.append(user)
+                                                valid_users.append({
+                                                    'comment':comment.get('createdAt'),
+                                                    'id':user['_id'],
+                                                    'username':user['username']
+                                                })
 
                                 if not _next:break
                         return True, f'{post.get('commentCount')} processed for post {post_id}'
@@ -472,19 +479,18 @@ class Creator:
                             
                         
                         # Add message to db
-                        success, db_msg = Utils.add_message({
-                            'message_id': chat_id,
-                            'admin': admin,
-                            'creator_id': creator_internal_id,
-                            'creator_name': creator_name,
-                            'recipient_id': user['_id'],
-                            'recipient_name': user['username'],
-                            'has_media': has_media,
-                            'link': f'https://app.maloum.com/chat/{chat_id}',
-                            'sender_status': 'sent',
-                            'caption': caption,
-                            'price': price
-                        })
+                        success, db_msg = Utils.add_message(
+                            chat_id,
+                            admin,
+                            creator_internal_id,
+                            creator_name,
+                            user['_id'],
+                            user['username'],
+                            has_media,
+                            f'https://app.maloum.com/chat/{chat_id}',
+                            'sent',
+                            caption,
+                            price)
                         if not success:raise Exception(f'Error adding message to database for {msg["recipient_name"]} by {creator_name}: {db_msg}')
                         Utils.write_log(f'=== Successfully sent a message to {msg["recipient_name"]} by {creator_name} ===')
                         
@@ -900,8 +906,8 @@ class _MALOUM:
             }
 
             success, scrapers, total_scrapers = Utils.get_creators(admin=admin, limit=100, category='users')
-            if not success:
-                raise Exception(scrapers)
+            if not success:raise Exception(scrapers)
+            if total_scrapers < 1: raise Exception('Scrapers can not be empty')
 
             len_scrapers = len(scrapers)
             if len_scrapers < total_scrapers:
@@ -913,33 +919,45 @@ class _MALOUM:
 
             Utils.write_log(f'=== Scraping started for {task_id} ===')
 
+            offset = 0
+            count = config.get('max_actions',10)
+            last_activity = config.get('last_activity',7)
+
             while True:
                 success, task_status = Utils.check_task_status(task_id)
                 if not success:
                     raise Exception(task_status)
                 if task_status['status'].lower() in ['cancelled', 'canceled']:
                     break
+                
+                target_scraper = random.choice(scrapers)
+                success, scraper = await Creator().login(
+                    admin, 
+                    target_scraper['email'], 
+                    target_scraper['data']['details']['user']['password'],
+                    reuse_ip=target_scraper.get('reuse_ip', True), 
+                    task_id=task_id, 
+                    category='users'
+                )
 
-                tasks = [
-                    Creator().scrape_users(admin, task_id, scraper, scrapers, config)
-                    for scraper in scrapers
-                ]
-                results = await asyncio.gather(*tasks, return_exceptions=True)
+                success, result = Creator().scrape_users(
+                    admin, 
+                    task_id, 
+                    scraper, 
+                    count = count,
+                    last_activity = config.get('last_activity'),
+                    offset = offset)
 
-                for success, result in results:
-                    if not success:
-                        client_msg = {'msg': f'Error messaging creators on {task_id}: {result}', 'status': 'error', 'type': 'message'}
-                        success, msg = Utils.update_client(client_msg)
-                        if not success:
-                            Utils.write_log(msg)
-                    Utils.write_log(f'=== {result} ===')
+                if not success:
+                    client_msg = {'msg': f'Error messaging creators on {task_id}: {result}', 'status': 'error', 'type': 'message'}
+                    success, msg = Utils.update_client(client_msg)
+
+                Utils.write_log(f'=== {result} ===')
 
                 wait_message = f'Waiting for {time_message[str(time_between)]} before sending another batch of messages'
                 Utils.write_log(wait_message)
                 client_msg = {'msg': wait_message, 'status': 'success', 'type': 'message'}
                 success, msg = Utils.update_client(client_msg)
-                if not success:
-                    Utils.write_log(msg)
                 
                 sleep_time = 10
                 for _ in range(int(time_between / sleep_time)):
@@ -949,6 +967,8 @@ class _MALOUM:
                     if task_status['status'].lower() in ['cancelled', 'canceled']:
                         raise Cancelled(task_status)
                     await asyncio.sleep(sleep_time)
+
+                offset += count 
 
 
         except Cancelled as error:
@@ -965,8 +985,8 @@ class _MALOUM:
         except Exception as e:
             Utils.write_log(e)
             task_status = 'failed'
-            task_msg = f'Error in messaging | {task_id}: {e}'
-            client_msg = {'msg': f'Error in messaging | {task_id}: {e}', 'status': 'error', 'type': 'message'}
+            task_msg = f'Error in scraping | {task_id}: {e}'
+            client_msg = {'msg': f'Error in scraping | {task_id}: {e}', 'status': 'error', 'type': 'message'}
             success, msg = Utils.update_client(client_msg)
             if not success:
                 Utils.write_log(msg)
