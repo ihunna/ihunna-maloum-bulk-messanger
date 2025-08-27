@@ -403,7 +403,7 @@ class Creator:
                 session.cookie_jar.update_cookies(creator_data.get('cookies'))
                 proxies = creator.get('proxies', Utils.format_proxy(random.choice(self.proxies))) if creator.get('reuse_ip', True) else Utils.format_proxy(random.choice(self.proxies))
 
-                offset, limit = 0, 50
+                offset, limit = 0, max_actions
                 users, found_users = [], 0
 
                 # 🔁 Pull only users NOT previously messaged by this creator (from DB)
@@ -461,19 +461,53 @@ class Creator:
                         # Check for existing messages in the chat
                         async with session.get(
                             f'https://api.maloum.com/chats/{chat_id}/messages',
-                            params={'limit': 1},
+                            params={'limit': 50},   # fetch enough to find the creator's last msg
                             proxy=proxies,
                             timeout=20
                         ) as response:
                             if not response.ok:
                                 Utils.write_log(f"--- Failed to check messages for chat {chat_id}: {await response.text()} ---")
                                 continue
-                            messages = (await response.json()).get('data', [])
-                            if len(messages) > 0:
-                                client_msg = {'msg': f'Skipping chat with user @{username} by {creator_name} as it already has messages', 'status': 'success', 'type': 'message'}
-                                success, msg = Utils.update_client(client_msg)
-                                Utils.write_log(f"--- Skipping chat with user @{username} by {creator_name} as it already has messages ---")
-                                continue
+                            
+                            data = await response.json()
+                            messages = data.get('data', [])
+
+                            if messages:
+                                # Find the last message where the sender is the creator
+                                creator_messages = [m for m in messages if m.get('senderId') == creator_id]
+                                if creator_messages:
+                                    last_msg = creator_messages[-1]  # last one authored by creator
+
+                                    msg_text = last_msg.get('content', {}).get('text', '')
+                                    has_media = last_msg.get('content', {}).get('type') != 'text'
+
+                                    success, add_msg_resp = Utils.add_message(
+                                        chat_id,
+                                        admin,
+                                        creator_internal_id,
+                                        creator_name,
+                                        recipient_id,
+                                        username,
+                                        has_media,
+                                        f'https://app.maloum.com/chat/{chat_id}',
+                                        'sent',   # always "sent" since creator authored it
+                                        msg_text,
+                                        price,
+                                        task_id
+                                    )
+
+                                    if success:
+                                        client_msg = {
+                                            'msg': f'Backfilled last sent message for user @{username} by {creator_name}',
+                                            'status': 'success',
+                                            'type': 'message'
+                                        }
+                                        Utils.update_client(client_msg)
+                                        Utils.write_log(f"--- Backfilled last sent message for user @{username} by {creator_name} ---")
+                                        continue
+                                    else:
+                                        Utils.write_log(f"--- Failed to backfill last sent message for {username}: {add_msg_resp} ---")
+                                        continue
 
                         # Prepare message
                         chosen_caption = random.choice(captions) if caption_source == 'creator' else caption
