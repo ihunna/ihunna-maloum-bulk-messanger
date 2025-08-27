@@ -277,6 +277,12 @@ def handle_creators(action):
             task.start()
             
             if task.is_alive():
+                success,msg = Utils.update_task(task_id,{
+                    'status':'running',
+                    'message':'Adding creators'
+                })
+                if not success:Utils.write_log(msg)
+                
                 success,msg = Utils.update_client({'msg':f'{task_id} successfully created','status':'success','type':'message'})
                 if not success:Utils.write_log(msg)
                 
@@ -549,7 +555,7 @@ def scraper():
             return render_template('add-tasks.html', action='start-scraping')
         
         elif request.method == 'POST':
-            return jsonify({'msg': 'Not in commission'}), 400
+            # return jsonify({'msg': 'Not in commission'}), 400
             admin = session['USER']['id']
 
             if len(Utils.load_proxies()) < 1:
@@ -601,7 +607,18 @@ def scraper():
                     'status':'running',
                     'message':'Started scraper'
                 })
-       
+
+                success,msg = Utils.update_client({'msg':f'Task {task_id} successfully created','status':'success','type':'message'})
+                if not success:Utils.write_log(msg)
+                
+                else:
+                    Utils.write_log(msg)
+                    Utils.write_log(f'Task successfully created')
+
+                    return jsonify({'msg': f'Task successfully started'}), 200
+                
+            else:
+                return jsonify({'msg': f'Could not start task {task_id}'}), 400
 
         else: raise Exception('No method provided')
     except Exception as error:

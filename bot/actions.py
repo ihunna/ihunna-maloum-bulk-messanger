@@ -179,6 +179,7 @@ class Creator:
             'sec-fetch-site': 'same-site'
         }
         self._message_cache = {}  # Cache for recent recipients per creator
+        self.scraped_cache = []
         
     def format_proxy(self,proxies):
         return proxies['http']
@@ -214,7 +215,7 @@ class Creator:
             except Exception as e:
                 return False, f'Error saving media ID {post_id} for creator {creator_id}: {str(e)}'
 
-    async def scrape_users(self, scraper, admin, creator_id, task_id, count=50, limit=50, offset=0, last_activity=7):
+    async def scrape_users(self, scraper, admin, task_id, count=50, limit=50, offset=0, last_activity=7):
         try:
             success, task_status = Utils.check_task_status(task_id)
             if not success:
@@ -222,23 +223,13 @@ class Creator:
             if task_status['status'].lower() in ['cancelled', 'canceled']:
                 return False, 'Task canceled'
             
-            client_msg = {'msg': f'Scraping users by {creator_id}', 'status': 'success', 'type': 'message'}
-            success,msg = Utils.update_client(client_msg)
-
-            # Check cache for recent recipients
-            if creator_id in self._message_cache:
-                recent_recipients = self._message_cache[creator_id]
-            else:
-                success, messages, total_messages = Utils.get_messages(
-                    admin=admin, limit=100, offset=0, constraint='creator_id', keyword=creator_id
-                )
-                if not success:return False, messages
-                recent_recipients = {m.get('recipient_id') for m in messages}
-                self._message_cache[creator_id] = recent_recipients
+            client_msg = {'msg': f'Scraping users by {scraper["id"]}', 'status': 'success', 'type': 'message'}
+            success, msg = Utils.update_client(client_msg)
 
             async with aiohttp.ClientSession(headers=scraper.get('headers')) as session:
                 session.cookie_jar.update_cookies(scraper.get('cookies'))
-                proxies = scraper.get('proxies', Utils.format_proxy(random.choice(self.proxies))) if scraper.get('reuse_ip', True) else Utils.format_proxy(random.choice(self.proxies))
+                proxies = scraper.get('proxies', Utils.format_proxy(random.choice(self.proxies))) \
+                    if scraper.get('reuse_ip', True) else Utils.format_proxy(random.choice(self.proxies))
 
                 async with session.get(
                     'https://api.maloum.com/content/discovery',
@@ -251,27 +242,53 @@ class Creator:
                     posts = (await response.json()).get('data', [])
 
                 valid_users = []
-                seen_users = set(recent_recipients)
+                candidate_users = []
+                BATCH_SIZE = 100
                 lock = asyncio.Lock()
+
+                async def flush_candidates():
+                    nonlocal candidate_users, valid_users
+                    if not candidate_users:
+                        return
+
+                    ids = [u["_id"] for u in candidate_users]
+                    success, existing_ids = Utils.get_existing_user_ids(ids, admin=admin)
+                    if not success:
+                        Utils.write_log(f"DB check failed: {existing_ids}")
+                        candidate_users = []
+                        return
+
+                    new_users = [u for u in candidate_users if u["_id"] not in existing_ids]
+
+                    if new_users:
+                        success, msg = Utils.add_users(new_users, admin=admin, task_id=task_id)
+                        if not success:Utils.write_log(f"Insert failed: {msg}")
+                        else:valid_users.extend(new_users)
+
+                    candidate_users = []
 
                 async def process_post(post):
                     try:
                         success, task_status = Utils.check_task_status(task_id)
-                        if not success:raise Exception(task_status)
+                        if not success:
+                            raise Exception(task_status)
                         if task_status['status'].lower() in ['cancelled', 'canceled']:
                             return False, 'Task canceled'
 
                         post_id, comment_count, _next = post.get('_id'), post.get('commentCount'), None
-                        if not post_id or comment_count is None:raise Exception('Post ID or Comment count missing from post dict')
+                        if not post_id or comment_count is None:
+                            raise Exception('Post ID or Comment count missing from post dict')
                         
                         while comment_count > 0:
                             success, task_status = Utils.check_task_status(task_id)
-                            if not success:raise Exception(task_status)
+                            if not success:
+                                raise Exception(task_status)
                             if task_status['status'].lower() in ['cancelled', 'canceled']:
                                 return False, 'Task canceled'
                             
                             params = {'limit': '50'}
-                            if _next is not None: params['next'] = _next
+                            if _next is not None:
+                                params['next'] = _next
                             
                             async with session.get(
                                 f'https://api.maloum.com/posts/{post_id}/comments',
@@ -279,35 +296,42 @@ class Creator:
                                 proxy=proxies,
                                 timeout=20
                             ) as response:
-                                if not response.ok: raise Exception(f'could not get comment for post | {post_id} | {await response.text()}')
+                                if not response.ok:
+                                    raise Exception(f'could not get comment for post | {post_id} | {await response.text()}')
                                 
                                 data = await response.json()
                                 comments, _next = data.get('data', []), data.get('next')
                                 comment_count -= len(comments)
 
                                 for comment in comments:
-                                    user = comment.get('user')
-                                    if not user: continue
-                                    
+                                    u = comment.get('user')
+                                    if not u:
+                                        continue
+
+                                    user = {
+                                        "_id": u["_id"],
+                                        "username": u["username"],
+                                        "commented_at": comment.get("createdAt")
+                                    }
+
                                     if (
                                         Utils.compare_date(comment.get('createdAt'), days_ago=last_activity) 
-                                        and not user.get('isCreator', True)
-                                        ):
-                                        
+                                        and not u.get('isCreator', True)
+                                    ):
                                         async with lock:
                                             if len(valid_users) >= count:
-                                                return True, f'{post.get('commentCount')} processed for post {post_id}'
-                                            
-                                            if user['_id'] not in seen_users:
-                                                seen_users.add(user['_id'])
-                                                valid_users.append({
-                                                    'comment':comment.get('createdAt'),
-                                                    'id':user['_id'],
-                                                    'username':user['username']
-                                                })
+                                                await flush_candidates()
+                                                return True, f'{post.get("commentCount")} processed for post {post_id}'
 
-                                if not _next:break
-                        return True, f'{post.get('commentCount')} processed for post {post_id}'
+                                            candidate_users.append(user)
+                                            if len(candidate_users) >= BATCH_SIZE:
+                                                await flush_candidates()
+                                            
+                                if not _next:
+                                    break
+                        
+                        await flush_candidates()
+                        return True, f'{post.get("commentCount")} processed for post {post_id}'
                     except Exception as error:
                         return False, f'{post.get("_id")} failed to process comments | {error}'
 
@@ -315,17 +339,17 @@ class Creator:
                 results = await asyncio.gather(*tasks, return_exceptions=True)
                 for i, result in enumerate(results):
                     if isinstance(result, Exception):
-                        Utils.write_log(result[1])
+                        Utils.write_log(result)
                     elif isinstance(result, tuple) and not result[0]:
                         Utils.write_log(result[1])
                 
-                if not valid_users:raise Exception('No users found')
-                client_msg = {'msg': f'Found {len(valid_users)} users by {creator_id}', 'status': 'success', 'type': 'message'}
-                success,msg = Utils.update_client(client_msg)
-                return True, valid_users
+                if not valid_users:
+                    raise Exception('No users found')
+                return True, f'Scraped {len(valid_users)} users by {scraper["id"]}'
 
         except Exception as e:
             return False, f'Error scraping users: {e}'
+
 
     async def send_messages(self, admin, task_id, creator, scrapers, config, max_actions):
         try:
@@ -335,7 +359,8 @@ class Creator:
             if task_status['status'].lower() in ['cancelled', 'canceled']:
                 return False, 'Task canceled'
 
-            if not creator.get('data', {}):raise Exception(f'creator data not available')
+            if not creator.get('data', {}):
+                raise Exception('creator data not available')
 
             email = creator['data']['details']['user']['email']
             password = creator['data']['details']['user']['password']
@@ -343,8 +368,8 @@ class Creator:
             success, _creator = await self.login(
                 admin, email, password, reuse_ip=creator.get('reuse_ip', True), task_id=task_id
             )
-
-            if not success:raise Exception(_creator)
+            if not success:
+                raise Exception(_creator)
             creator_data = _creator
 
             auth_token = creator_data['details']['user']['accessToken']
@@ -368,58 +393,72 @@ class Creator:
                     captions = [line.strip() for line in f.readlines()]
                     if not captions:
                         raise ValueError('Captions cannot be empty')
-            
-            if len(scrapers) < 1: raise Exception('Scrapers must not be empty')
-            target_scraper = random.choice(scrapers)
-            success, scraper = await self.login(
-                admin, target_scraper['email'], target_scraper['data']['details']['user']['password'],
-                reuse_ip=target_scraper.get('reuse_ip', True), task_id=task_id, category='users'
-            )
-            if not success:
-                raise Exception(scraper)
+
+            # NOTE: scraping is handled elsewhere now; this function only pulls from DB
+            client_msg = {'msg': f'Fetching users from DB (unmessaged by {creator_name})', 'status': 'success', 'type': 'message'}
+            success, msg = Utils.update_client(client_msg)
 
             async with aiohttp.ClientSession() as session:
                 session.headers.update(creator_data.get('headers'))
                 session.cookie_jar.update_cookies(creator_data.get('cookies'))
                 proxies = creator.get('proxies', Utils.format_proxy(random.choice(self.proxies))) if creator.get('reuse_ip', True) else Utils.format_proxy(random.choice(self.proxies))
 
-                offset, limit, users, found_users = 0, 50, [], 0
+                offset, limit = 0, 50
+                users, found_users = [], 0
+
+                # 🔁 Pull only users NOT previously messaged by this creator (from DB)
                 while found_users < max_actions:
-                    success, new_users = await self.scrape_users(
-                        scraper, admin, creator_internal_id, task_id, count=max_actions, limit=limit, offset=offset
-                    )
-                    if not success:
+                    # expects you have Utils.get_unmessaged_users(creator_id, limit, offset) implemented
+                    ok, new_users = Utils.get_unmessaged_users(creator_internal_id, limit=limit, offset=offset)
+                    if not ok:
                         raise Exception(new_users)
+                    if not new_users:
+                        break
+
                     users.extend(new_users)
                     found_users += len(new_users)
                     offset += limit
-                    
+
                 success_messages = 0
 
                 for user in users:
-                    # Create new chat
-                    async with session.post(
-                        'https://api.maloum.com/chats',
-                        json={'member2': user.get('_id')},
-                        proxy=proxies,
-                        timeout=20
-                    ) as response:
-                        if not response.ok:
-                            Utils.write_log(f"--- Failed to create chat for user {user['username']}: {await response.text()} ---")
-                            
-                            client_msg = {'msg': f'Failed to create chat for user {user['username']}: {await response.text()}', 'status': 'error', 'type': 'message'}
-                            success, msg = Utils.update_client(client_msg)
+                    try:
+                        # Check cancel
+                        success, task_status = Utils.check_task_status(task_id)
+                        if not success:
+                            raise Exception(task_status)
+                        if task_status['status'].lower() in ['cancelled', 'canceled']:
+                            return False, 'Task canceled'
 
+                        # Handle id field naming (`_id` vs `id`)
+                        recipient_id = user.get('_id') or user.get('id')
+                        if not recipient_id:
+                            Utils.write_log(f"--- Skipping user without id: {user} ---")
                             continue
+                        username = user.get('username', 'unknown')
 
-                        chat_id = (await response.json()).get('_id')
-                        if not chat_id:
-                            client_msg = {'msg': f"--- No chat ID found for user {user.get('_id')} ---", 'status': 'error', 'type': 'message'}
-                            success, msg = Utils.update_client(client_msg)
-                            Utils.write_log(f"--- No chat ID found for user {user.get('_id')} ---")
-                            continue
+                        # Create new chat
+                        async with session.post(
+                            'https://api.maloum.com/chats',
+                            json={'member2': recipient_id},
+                            proxy=proxies,
+                            timeout=20
+                        ) as response:
+                            if not response.ok:
+                                err_text = await response.text()
+                                Utils.write_log(f"--- Failed to create chat for user {username}: {err_text} ---")
+                                client_msg = {'msg': f"Failed to create chat for user {username}: {err_text}", 'status': 'error', 'type': 'message'}
+                                success, msg = Utils.update_client(client_msg)
+                                continue
 
-                        # # Check for existing messages in the chat
+                            chat_id = (await response.json()).get('_id')
+                            if not chat_id:
+                                client_msg = {'msg': f"--- No chat ID found for user {recipient_id} ---", 'status': 'error', 'type': 'message'}
+                                success, msg = Utils.update_client(client_msg)
+                                Utils.write_log(f"--- No chat ID found for user {recipient_id} ---")
+                                continue
+
+                        # Check for existing messages in the chat
                         async with session.get(
                             f'https://api.maloum.com/chats/{chat_id}/messages',
                             params={'limit': 1},
@@ -431,17 +470,17 @@ class Creator:
                                 continue
                             messages = (await response.json()).get('data', [])
                             if len(messages) > 0:
-                                client_msg = {'msg': f'Skipping chat with user @{user["username"]} by {creator_name} as it already has messages', 'status': 'success', 'type': 'message'}
-                                success,msg = Utils.update_client(client_msg)
-                                Utils.write_log(f"--- Skipping chat with user @{user["username"]} by {creator_name} as it already has messages ---")
+                                client_msg = {'msg': f'Skipping chat with user @{username} by {creator_name} as it already has messages', 'status': 'success', 'type': 'message'}
+                                success, msg = Utils.update_client(client_msg)
+                                Utils.write_log(f"--- Skipping chat with user @{username} by {creator_name} as it already has messages ---")
                                 continue
 
                         # Prepare message
-                        caption = random.choice(captions) if caption_source == 'creator' else caption
+                        chosen_caption = random.choice(captions) if caption_source == 'creator' else caption
 
                         content = {
-                            'type': 'text', 
-                            'text': caption
+                            'type': 'text',
+                            'text': chosen_caption
                         }
 
                         if has_media and media_id:
@@ -454,16 +493,17 @@ class Creator:
                             content = {
                                 "type": "media" if not (is_paid and price > 0) else "chat_product",
                                 "media": [media_info],
-                                "text": caption
+                                "text": chosen_caption
                             }
                             if is_paid and price > 0:
                                 content["priceNet"] = price
-                        
+                            
                         json_data = {
-                            'content':content,
-                            'optimisticMessageId':str(uuid.uuid4())
+                            'content': content,
+                            'optimisticMessageId': str(uuid.uuid4())
                         }
-                        # Introduce random delay to avoid rate-limiting
+
+                        # Random delay to avoid rate-limiting
                         await asyncio.sleep(random.randint(2, 5))
 
                         # Send the message
@@ -477,36 +517,49 @@ class Creator:
                                 Utils.write_log(f"--- Failed to send message for chat {chat_id}: {await response.text()} ---")
                                 continue
                             
-                        
-                        # Add message to db
-                        success, db_msg = Utils.add_message(
+                        # Add message to db via Utils.add_message
+                        success, add_msg_resp = Utils.add_message(
                             chat_id,
                             admin,
                             creator_internal_id,
                             creator_name,
-                            user['_id'],
-                            user['username'],
+                            recipient_id,
+                            username,
                             has_media,
                             f'https://app.maloum.com/chat/{chat_id}',
                             'sent',
-                            caption,
-                            price)
-                        if not success:raise Exception(f'Error adding message to database for {msg["recipient_name"]} by {creator_name}: {db_msg}')
-                        Utils.write_log(f'=== Successfully sent a message to {msg["recipient_name"]} by {creator_name} ===')
+                            chosen_caption,
+                            price,
+                            task_id
+                        )
+                        if not success:
+                            raise Exception(f'Error adding message to database for {username} by {creator_name}: {add_msg_resp}')
+                        Utils.write_log(f'=== Successfully sent a message to {username} by {creator_name} ===')
                         
-                        client_msg = {'msg': f'Successfully sent a message to {msg["recipient_name"]} by {creator_name}', 'status': 'success', 'type': 'message'}
-                        success, db_msg = Utils.update_client(client_msg)
-                        if not success:Utils.write_log(db_msg)
+                        client_msg = {'msg': f'Successfully sent a message to {username} by {creator_name}', 'status': 'success', 'type': 'message'}
+                        success, update_msg = Utils.update_client(client_msg)
+                        if not success:
+                            Utils.write_log(update_msg)
 
-                        success_messages += 0
-                    
+                        success_messages += 1
 
-                if success_messages > 0:
-                    return True, f'Successfully sent messages to {success_messages} users by {creator_name}'
-                else: return False, f'{creator_name} could not send any messages to users'
+                        if success_messages >= max_actions:
+                            break
+
+                    except Exception as e:
+                        Utils.write_log(str(e))
+                        client_msg = {'msg': f'Failed to message user {username}: {e}', 'status': 'error', 'type': 'message'}
+                        success, _ = Utils.update_client(client_msg)
+                        continue
+
+            if success_messages > 0:
+                return True, f'Successfully sent messages to {success_messages} users by {creator_name}'
+            else:
+                return False, f'{creator_name} could not send any messages to users'
 
         except Exception as e:
             return False, f'Error sending messages to users for {creator.get("id")}: {str(e)}'
+
 
     async def login(self, admin, email, password, reuse_ip=True, task_id=None, category='creators'):
         async with aiohttp.ClientSession() as session:
@@ -940,10 +993,10 @@ class _MALOUM:
                     category='users'
                 )
 
-                success, result = Creator().scrape_users(
+                success, result = await Creator().scrape_users(
+                    scraper, 
                     admin, 
                     task_id, 
-                    scraper, 
                     count = count,
                     last_activity = config.get('last_activity'),
                     offset = offset)
@@ -952,7 +1005,12 @@ class _MALOUM:
                     client_msg = {'msg': f'Error messaging creators on {task_id}: {result}', 'status': 'error', 'type': 'message'}
                     success, msg = Utils.update_client(client_msg)
 
+                else:
+                    client_msg = {'msg': result, 'status': 'success', 'type': 'message'}
+                    success, msg = Utils.update_client(client_msg)
+
                 Utils.write_log(f'=== {result} ===')
+
 
                 wait_message = f'Waiting for {time_message[str(time_between)]} before sending another batch of messages'
                 Utils.write_log(wait_message)

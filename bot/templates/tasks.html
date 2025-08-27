@@ -32,7 +32,13 @@
                                 <div class="table-cell">
                                     {{ task.id }}
                               </div>  
-                                <div class="table-cell badge double-cell">Active DM task</div>
+                                <div class="table-cell badge double-cell">
+                                    {%if task.type == 'messages'%}
+                                        Active DM task
+                                    {%else%}
+                                        Active scraper task
+                                    {%endif%}
+                                </div>
                                 <div class="table-cell">{{ task.action_count}}</div>                             
                                 <div class="table-cell double-cell">{{ task.created_at}}</div>
                                 <div class="table-cell badge task_status">

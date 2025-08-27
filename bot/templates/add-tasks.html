@@ -1,6 +1,6 @@
 {% extends "layout.html"%}
 {% block title %}
- Messages
+{{g.page | capitalize}}
 {% endblock %} 
 
 {%block main_content%}
@@ -325,7 +325,7 @@
         <section class="add-scraper">
             <div class="holder form-holder">
                     <div class="task-tab">
-                        <a href="{{url_for('scraper')}}">Messanger <i class="fas fa-arrow-right"></i></a>
+                        <a href="{{url_for('messages', action='start-messaging')}}">Messanger <i class="fas fa-arrow-right"></i></a>
                     </div>
                     <form action="" id="scraper-form" data-action="Scrape accounts" 
                         data-action-url="{{ url_for('scraper') }}" data-action-message="Staring scraper..." 

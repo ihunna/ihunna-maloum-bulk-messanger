@@ -164,6 +164,17 @@ class Utils:
                     sender_status TEXT,
                     caption TEXT,
                     price REAL DEFAULT 0,
+                    task_id TEXT DEFAULT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )''')
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    admin TEXT,
+                    username TEXT,
+                    commented_at TEXT,
+                    task_id TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )''')
             
@@ -631,15 +642,15 @@ class Utils:
         
     
     @staticmethod
-    def add_message(message_id, admin, creator_id, creator_name, recipient_id, recipient_name, has_media, link, sender_status, caption, price):
+    def add_message(message_id, admin, creator_id, creator_name, recipient_id, recipient_name, has_media, link, sender_status, caption, price, task_id):
         success, msg = False, ''
         conn = sqlite3.connect(db_file)
         cursor = conn.cursor()
         try:
             cursor.execute("""INSERT INTO messages \
-                (id, admin, creator_id, creator_name, recipient_id, recipient_name, has_media, link, sender_status, caption, price) \
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (message_id, admin, creator_id, creator_name, recipient_id, recipient_name, has_media, link, sender_status, caption, price))
+                (id, admin, creator_id, creator_name, recipient_id, recipient_name, has_media, link, sender_status, caption, price, task_id) \
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (message_id, admin, creator_id, creator_name, recipient_id, recipient_name, has_media, link, sender_status, caption, price, task_id))
             conn.commit()
             success, msg = True, 'Message added successfully'
         except Exception as error:
@@ -748,7 +759,170 @@ class Utils:
         finally:
             conn.close()
             return success, messages, total_messages
+        
 
+    @staticmethod
+    def add_user(user_id,admin,username,commented_at,task_id=None):
+        success,msg = False,''
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("INSERT INTO users (id, admin, username, commented_at, task_id) VALUES (?, ?, ?, ?, ?)", (user_id,admin,username,commented_at,task_id))
+            conn.commit()
+            
+            success,msg = True, 'User added successfully'
+        except Exception as error:
+            success,msg =  False, str(f'Error adding user :{error}')
+        finally:
+            conn.close()
+            return success,msg
+        
+
+    @staticmethod
+    def delete_user(user_id):
+        success,msg = False	,''
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        try:
+
+            cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+            conn.commit()
+
+            success,msg =  True,'User deleted successfully'
+
+        except Exception as error:
+            success,msg = False,str(error)
+        finally:
+            conn.close()
+            return success,msg
+        
+
+    @staticmethod
+    def get_users(admin, limit=20, offset=0, constraint=None, keyword=None):
+        success, users, total_users = True, [], 0
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        try:
+            if constraint is not None and keyword is not None:
+                cursor.execute(f"SELECT COUNT(*) FROM users WHERE {constraint} = ? AND admin = ?", (keyword, admin))
+                total_users = cursor.fetchone()[0]
+
+                cursor.execute(
+                    f"""SELECT * FROM users 
+                    WHERE {constraint} = ? AND admin = ?
+                    ORDER BY created_at DESC 
+                    LIMIT ? OFFSET ?""",
+                    (keyword, admin, limit, offset)
+                )
+                rows = cursor.fetchall()
+
+                users = [{
+                    'id': row[0], 
+                    'status': row[1], 
+                    'admin':row[2],
+                    'commented_at':row[3],
+                    'task_id':row[4],
+                    'created_at': row[5]
+                    } for row in rows]
+            else:
+
+                cursor.execute("SELECT COUNT(*) FROM users WHERE admin = ?", (admin,))
+                total_users = cursor.fetchone()[0]
+
+                cursor.execute("SELECT * FROM users WHERE admin = ? ORDER BY created_at DESC LIMIT ? OFFSET ?", (admin, limit, offset))
+                rows = cursor.fetchall()
+
+                users = [{
+                    'id': row[0], 
+                    'status': row[1], 
+                    'admin':row[2],
+                    'commented_at':row[3],
+                    'task_id':row[4],
+                    'created_at': row[5]
+                    } for row in rows]
+
+        except Exception as error:
+            success, users = False, str(error)
+
+        finally:
+            conn.close()
+            return success, users, total_users
+        
+    @staticmethod
+    def get_existing_user_ids(user_ids, admin=None):
+        """
+        Return list of user IDs that already exist in DB.
+        """
+        success, existing = True, []
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        try:
+            if not user_ids:
+                return True, []
+
+            placeholders = ",".join(["?"] * len(user_ids))
+            params = list(user_ids)
+
+            if admin is not None:
+                query = f"SELECT id FROM users WHERE id IN ({placeholders}) AND admin = ?"
+                params.append(admin)
+            else:
+                query = f"SELECT id FROM users WHERE id IN ({placeholders})"
+
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            existing = [row[0] for row in rows]
+
+        except Exception as error:
+            success, existing = False, str(error)
+
+        finally:
+            conn.close()
+            return success, existing
+        
+
+    @staticmethod
+    def get_unmessaged_users(creator_id, limit=50, offset=0):
+        try:
+            conn = sqlite3.connect(db_file)
+            cursor = conn.cursor()
+
+            # Select users who do not exist in the messages table for this creator
+            cursor.execute("""
+                SELECT u.id, u.username
+                FROM users u
+                WHERE u.id NOT IN (
+                    SELECT m.recipient_id
+                    FROM messages m
+                    WHERE m.creator_id = ?
+                )
+                LIMIT ? OFFSET ?
+            """, (creator_id, limit, offset))
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            users = [{'id': row[0], 'username': row[1]} for row in rows]
+            return True, users
+        except Exception as e:
+            return False, str(e)
+        
+
+    @staticmethod
+    def add_users(users,admin=None,task_id=None):
+        try:
+            for user in users:
+                success,msg = Utils.add_user(
+                    user.get('_id'),
+                    admin,
+                    user.get('username'),
+                    user.get('commented_at'),
+                    task_id=task_id
+                )
+                if not success:return False, msg
+            return True, f'saved all {len(users)} users'
+        except Exception as error:
+            return False, error
 
     @staticmethod
     def time_diff(timestamp):
