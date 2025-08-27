@@ -1026,7 +1026,7 @@ class _MALOUM:
                         raise Cancelled(task_status)
                     await asyncio.sleep(sleep_time)
 
-                offset += count 
+                offset += count if offset < 400 else 0
 
 
         except Cancelled as error:
