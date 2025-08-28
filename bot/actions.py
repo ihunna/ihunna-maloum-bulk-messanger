@@ -215,7 +215,7 @@ class Creator:
             except Exception as e:
                 return False, f'Error saving media ID {post_id} for creator {creator_id}: {str(e)}'
 
-    async def scrape_users(self, scraper, admin, task_id, count=50, limit=50, offset=0, last_activity=7):
+    async def scrape_users(self, scrapers, admin, task_id, count=50, limit=50, offset=0, last_activity=7):
         try:
             success, task_status = Utils.check_task_status(task_id)
             if not success:
@@ -223,6 +223,18 @@ class Creator:
             if task_status['status'].lower() in ['cancelled', 'canceled']:
                 return False, 'Task canceled'
             
+            scraper = random.choice(scrapers)
+            target_scraper = random.choice(scrapers)
+            success, scraper = await Creator().login(
+                admin, 
+                target_scraper['email'], 
+                target_scraper['data']['details']['user']['password'],
+                reuse_ip=target_scraper.get('reuse_ip', True), 
+                task_id=task_id, 
+                category='users'
+            )
+            if not success:raise Exception(scraper)
+
             client_msg = {'msg': f'Scraping users by {scraper["id"]}', 'status': 'success', 'type': 'message'}
             success, msg = Utils.update_client(client_msg)
 
@@ -269,11 +281,30 @@ class Creator:
 
                 async def process_post(post):
                     try:
+                        time.sleep(random.randint(2,5))
+
                         success, task_status = Utils.check_task_status(task_id)
                         if not success:
                             raise Exception(task_status)
                         if task_status['status'].lower() in ['cancelled', 'canceled']:
                             return False, 'Task canceled'
+                        
+
+                        target_scraper = random.choice(scrapers)
+                        success, scraper = await Creator().login(
+                            admin, 
+                            target_scraper['email'], 
+                            target_scraper['data']['details']['user']['password'],
+                            reuse_ip=target_scraper.get('reuse_ip', True), 
+                            task_id=task_id, 
+                            category='users'
+                        )
+                        if not success:raise Exception(scraper)
+
+                        session.headers.update(scraper.get('headers'))
+                        session.cookie_jar.update_cookies(scraper.get('cookies'))
+                        proxies = scraper.get('proxies', Utils.format_proxy(random.choice(self.proxies))) \
+                        if scraper.get('reuse_ip', True) else Utils.format_proxy(random.choice(self.proxies))
 
                         post_id, comment_count, _next = post.get('_id'), post.get('commentCount'), None
                         if not post_id or comment_count is None:
@@ -290,7 +321,6 @@ class Creator:
                             if _next is not None:
                                 params['next'] = _next
                             
-                            time.sleep(random.randint(2,5))
                             async with session.get(
                                 f'https://api.maloum.com/posts/{post_id}/comments',
                                 params=params,
@@ -1014,22 +1044,13 @@ class _MALOUM:
                 if task_status['status'].lower() in ['cancelled', 'canceled']:
                     break
                 
-                target_scraper = random.choice(scrapers)
-                success, scraper = await Creator().login(
-                    admin, 
-                    target_scraper['email'], 
-                    target_scraper['data']['details']['user']['password'],
-                    reuse_ip=target_scraper.get('reuse_ip', True), 
-                    task_id=task_id, 
-                    category='users'
-                )
 
                 success, result = await Creator().scrape_users(
-                    scraper, 
+                    scrapers, 
                     admin, 
                     task_id, 
                     count = count,
-                    last_activity = config.get('last_activity'),
+                    last_activity = last_activity,
                     offset = offset)
 
                 if not success:
