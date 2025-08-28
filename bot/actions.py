@@ -233,7 +233,7 @@ class Creator:
 
                 async with session.get(
                     'https://api.maloum.com/content/discovery',
-                    params={'limit': limit, 'next': offset, 'dsc_r': self.generate_sensor_data('dsc_r')},
+                    params={'limit': limit, 'dsc_r': self.generate_sensor_data('dsc_r')},
                     proxy=proxies,
                     timeout=20
                 ) as response:
@@ -1036,7 +1036,7 @@ class _MALOUM:
                     offset = offset)
 
                 if not success:
-                    client_msg = {'msg': f'Error messaging creators on {task_id}: {result}', 'status': 'error', 'type': 'message'}
+                    client_msg = {'msg': f'Error scraping users on {task_id}: {result}', 'status': 'error', 'type': 'message'}
                     success, msg = Utils.update_client(client_msg)
 
                 else:
@@ -1046,7 +1046,7 @@ class _MALOUM:
                 Utils.write_log(f'=== {result} ===')
 
 
-                wait_message = f'Waiting for {time_message[str(time_between)]} before sending another batch of messages'
+                wait_message = f'Waiting for {time_message[str(time_between)]} before scraping another batch of users'
                 Utils.write_log(wait_message)
                 client_msg = {'msg': wait_message, 'status': 'success', 'type': 'message'}
                 success, msg = Utils.update_client(client_msg)
