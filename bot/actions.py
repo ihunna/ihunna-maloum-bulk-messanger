@@ -233,7 +233,7 @@ class Creator:
 
                 async with session.get(
                     'https://api.maloum.com/content/discovery',
-                    params={'limit': limit, 'dsc_r': self.generate_sensor_data('dsc_r')},
+                    params={'limit': f'{limit}', 'dsc_r': self.generate_sensor_data('dsc_r')},
                     proxy=proxies,
                     timeout=20
                 ) as response:
