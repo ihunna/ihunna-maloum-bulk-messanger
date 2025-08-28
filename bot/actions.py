@@ -269,7 +269,7 @@ class Creator:
 
                 async def process_post(post):
                     try:
-                        time.sleep(random.uniform(1,5))
+                        time.sleep(random.randint(1,5))
                         success, task_status = Utils.check_task_status(task_id)
                         if not success:
                             raise Exception(task_status)
@@ -652,7 +652,7 @@ class Creator:
 
                         success, msg = Utils.update_creator(creator_id, email, user_data)
                         if not success:raise Exception(msg)
-                        session.close()
+                        await session.close()
                         user_data['id'] = creator_id
                         return True, user_data
 
@@ -743,7 +743,7 @@ class Creator:
                             raise Exception(msg)
 
                     user_data['id'] = creator_id
-                    session.close()
+                    await session.close()
                     return True, user_data
 
             except Exception as e:
