@@ -305,8 +305,7 @@ class Creator:
 
                                 for comment in comments:
                                     u = comment.get('user')
-                                    if not u:
-                                        continue
+                                    if not u:continue
 
                                     user = {
                                         "_id": u["_id"],
@@ -314,10 +313,7 @@ class Creator:
                                         "commented_at": comment.get("createdAt")
                                     }
 
-                                    if (
-                                        Utils.compare_date(comment.get('createdAt'), days_ago=last_activity) 
-                                        and not u.get('isCreator', True)
-                                    ):
+                                    if u.get('isCreator', True):
                                         async with lock:
                                             if len(valid_users) >= count:
                                                 await flush_candidates()
