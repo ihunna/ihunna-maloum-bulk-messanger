@@ -290,7 +290,7 @@ class Creator:
                             if _next is not None:
                                 params['next'] = _next
                             
-                            time.sleep(5)
+                            time.sleep(random.randint(2,5))
                             async with session.get(
                                 f'https://api.maloum.com/posts/{post_id}/comments',
                                 params=params,
