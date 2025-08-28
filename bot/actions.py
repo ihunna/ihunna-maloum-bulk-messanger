@@ -269,7 +269,7 @@ class Creator:
 
                 async def process_post(post):
                     try:
-                        time.sleep(random.randint(1,5))
+                        time.sleep(random.randint(1,3))
                         success, task_status = Utils.check_task_status(task_id)
                         if not success:
                             raise Exception(task_status)
@@ -330,7 +330,7 @@ class Creator:
                         await flush_candidates()
                         return True, f'{post.get("commentCount")} processed for post {post_id}'
                     except Exception as error:
-                        return False, f'{post.get("_id")} failed to process comments | {error}'
+                        return False, f'{post.get("_id")} failed to process comments | {str(error)}'
 
                 tasks = [process_post(post) for post in posts]
                 results = await asyncio.gather(*tasks, return_exceptions=True)
