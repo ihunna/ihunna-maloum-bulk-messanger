@@ -233,7 +233,7 @@ class Creator:
 
                 async with session.get(
                     'https://api.maloum.com/content/discovery',
-                    params={'limit': f'15', 'dsc_r': self.generate_sensor_data('dsc_r')},
+                    params={'limit': f'{limit}', 'dsc_r': self.generate_sensor_data('dsc_r')},
                     proxy=proxies,
                     timeout=20
                 ) as response:
@@ -287,7 +287,7 @@ class Creator:
                             if task_status['status'].lower() in ['cancelled', 'canceled']:
                                 return False, 'Task canceled'
                             
-                            params = {'limit': '15'}
+                            params = {'limit': '50'}
                             if _next is not None:
                                 params['next'] = _next
                             
