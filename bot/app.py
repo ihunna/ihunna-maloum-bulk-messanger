@@ -348,7 +348,7 @@ def creator():
 
                 data = {key: status}
 
-                success, msg = run_async_coroutine(Creator().update(creator, data))
+                success, msg = Creator().update(creator, data)
                 if not success:
                     Utils.write_log(msg)
                     return jsonify({'msg': 'Error updating user'}), 400
