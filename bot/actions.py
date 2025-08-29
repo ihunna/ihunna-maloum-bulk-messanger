@@ -337,10 +337,13 @@ class Creator:
                         
                         await flush_candidates()
                         return True, f'{post.get("commentCount")} processed for post {post_id}'
+                    
                     except Exception as error:
-                        tb = traceback.format_exc()
-                        return False, f'{post.get("_id")} failed to process comments | {error.__class__.__name__}: {str(error)}\n{tb}'
-
+                        if error == '':
+                            tb = traceback.format_exc()
+                            return False, f'{post.get("_id")} failed to process comments | {error.__class__.__name__}: {str(error)}\n{tb}'
+                        else:return False, f'{post.get("_id")} failed to process comments | {str(error)}'
+                
                 tasks = [process_post(post) for post in posts]
                 results = await asyncio.gather(*tasks, return_exceptions=True)
                 for i, result in enumerate(results):
