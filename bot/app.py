@@ -1147,18 +1147,40 @@ def do_logout():
         Utils.write_log(error)
         return jsonify({'msg': 'logout unsuccessful'}), 500
     
+    
 @app.route('/logs', methods=['GET'])
 @login_required
 @check_role
 def logs():
     try:
+        # Get the requested page number from query params (default = 1)
+        page = int(request.args.get('page', 1))
+        per_page = 100  # number of logs per page
+
         with open(logs_file, 'r', encoding='utf-8') as f:
             logs = f.readlines()
-            logs = list(reversed(logs))
-        return render_template('logs.html', logs=logs)
+            logs = list(reversed(logs))  # newest first
+
+        # Pagination math
+        start = (page - 1) * per_page
+        end = start + per_page
+        page_logs = logs[start:end]
+
+        # Compute if there's a next page
+        has_next = end < len(logs)
+        has_prev = start > 0
+
+        return render_template(
+            'logs.html',
+            logs=page_logs,
+            page=page,
+            has_next=has_next,
+            has_prev=has_prev
+        )
     except Exception as error:
         Utils.write_log(error)
         abort(500)
+
 
 @app.route('/logs/<action>', methods=['POST'])
 @login_required

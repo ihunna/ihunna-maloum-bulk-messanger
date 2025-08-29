@@ -269,7 +269,7 @@ class Creator:
 
                 async def process_post(post):
                     try:
-                        time.sleep(random.randint(1,3))
+                        time.sleep(random.randint(1,5))
                         success, task_status = Utils.check_task_status(task_id)
                         if not success:
                             raise Exception(task_status)
@@ -314,7 +314,7 @@ class Creator:
                                         "commented_at": comment.get("createdAt")
                                     }
 
-                                    if u.get('isCreator', True):
+                                    if not u.get('isCreator', True):
                                         async with lock:
                                             if len(valid_users) >= count:
                                                 await flush_candidates()
