@@ -303,7 +303,7 @@ class Creator:
                                 f'https://api.maloum.com/posts/{post_id}/comments',
                                 params=params,
                                 proxy=proxies,
-                                timeout=20
+                                timeout=60
                             ) as response:
                                 if not response.ok:
                                     raise Exception(f'could not get comment for post | {post_id} | {await response.text()}')
