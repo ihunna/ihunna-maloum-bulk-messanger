@@ -269,7 +269,7 @@ class Creator:
 
                 async def process_post(post):
                     try:
-                        # time.sleep(random.randint(1,5))
+                        time.sleep(random.randint(1,5))
                         success, task_status = Utils.check_task_status(task_id)
                         if not success:
                             raise Exception(task_status)
