@@ -227,7 +227,7 @@ class Creator:
             success, msg = Utils.update_client(client_msg)
 
             async with aiohttp.ClientSession(headers=scraper.get('headers')) as session:
-                session.cookie_jar.update_cookies(scraper.get('cookies'))
+                # session.cookie_jar.update_cookies(scraper.get('cookies'))
                 proxies = scraper.get('proxies', Utils.format_proxy(random.choice(self.proxies))) \
                     if scraper.get('reuse_ip', True) else Utils.format_proxy(random.choice(self.proxies))
 
@@ -269,7 +269,7 @@ class Creator:
 
                 async def process_post(post):
                     try:
-                        time.sleep(random.randint(1,2))
+                        time.sleep(random.randint(1,5))
                         success, task_status = Utils.check_task_status(task_id)
                         if not success:
                             raise Exception(task_status)
@@ -291,6 +291,14 @@ class Creator:
                             if _next is not None:
                                 params['next'] = _next
                             
+                            proxies = self.format_proxy(random.choice(self.proxies))
+                            del session.headers['x-client-info']
+                            del session.headers['x-supabase-api-version']
+                            del session.headers['apikey']
+                            session.headers.update({
+                                'user-agent': Utils.generate_user_agent('android', 1)
+                            })
+
                             async with session.get(
                                 f'https://api.maloum.com/posts/{post_id}/comments',
                                 params=params,
