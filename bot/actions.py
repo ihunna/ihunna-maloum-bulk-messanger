@@ -292,9 +292,9 @@ class Creator:
                                 params['next'] = _next
                             
                             proxies = self.format_proxy(random.choice(self.proxies))
-                            del session.headers['x-client-info']
-                            del session.headers['x-supabase-api-version']
-                            del session.headers['apikey']
+                            for key in ['x-client-info', 'x-supabase-api-version', 'apikey']:
+                                if key in session.headers:
+                                    del session.headers[key]
                             session.headers.update({
                                 'user-agent': Utils.generate_user_agent('android', 1)
                             })
