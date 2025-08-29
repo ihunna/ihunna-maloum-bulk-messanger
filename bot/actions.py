@@ -1,7 +1,7 @@
 from app_configs import creators_file,configs_folder,universal_files
 from utils import Utils
 from configs import *
-import io, threading, socketio, asyncio, aiohttp, ssl, functools
+import io, threading, socketio, asyncio, aiohttp, ssl, functools, traceback
 from aiohttp import ClientSession, TCPConnector
 
 Lock = threading.Lock()
@@ -338,7 +338,8 @@ class Creator:
                         await flush_candidates()
                         return True, f'{post.get("commentCount")} processed for post {post_id}'
                     except Exception as error:
-                        return False, f'{post.get("_id")} failed to process comments | {str(error)}'
+                        tb = traceback.format_exc()
+                        return False, f'{post.get("_id")} failed to process comments | {error.__class__.__name__}: {str(error)}\n{tb}'
 
                 tasks = [process_post(post) for post in posts]
                 results = await asyncio.gather(*tasks, return_exceptions=True)
