@@ -447,8 +447,24 @@ class Creator:
                                 client_msg = {'msg': f"Failed to create chat for user {username}: {err_text}", 'status': 'error', 'type': 'message'}
                                 success, msg = Utils.update_client(client_msg)
                                 continue
-
-                            chat_id = (await response.json()).get('_id')
+                            
+                            chat_data = await response.json()
+                            if chat_data.get('chatPartner',{}).get('isCreator', True):
+                                client_msg = {'msg': f"Skipping chat with {username} because it is a creator", 'status': 'error', 'type': 'message'}
+                                success, msg = Utils.update_client(client_msg)
+                                Utils.write_log(f"--- Skipping user {username} who is a creator ---")
+                                
+                                success,msg = Utils.delete_user(recipient_id)
+                                if not success:
+                                    Utils.write_log(f"--- Failed to delete user {username} who is a creator: {msg} ---")
+                                
+                                else:
+                                    client_msg = {'msg': f"Deleted {username} because it is a creator", 'status': 'error', 'type': 'message'}
+                                    success, msg = Utils.update_client(client_msg)
+                                    Utils.write_log(f"--- Deleted user {username} who is a creator ---")
+                                continue
+                            
+                            chat_id = (chat_data).get('_id')
                             if not chat_id:
                                 client_msg = {'msg': f"--- No chat ID found for user {recipient_id} ---", 'status': 'error', 'type': 'message'}
                                 success, msg = Utils.update_client(client_msg)
@@ -505,6 +521,10 @@ class Creator:
                                     else:
                                         Utils.write_log(f"--- Failed to backfill last sent message for {username}: {add_msg_resp} ---")
                                         continue
+                                
+                                else:
+                                    client_msg = {'msg': f"Skipping chat with {recipient_id} because it already has a message", 'status': 'error', 'type': 'message'}
+                                    success, msg = Utils.update_client(client_msg)
 
                         # Prepare message
                         chosen_caption = random.choice(captions) if caption_source == 'creator' else caption
