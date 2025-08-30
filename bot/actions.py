@@ -643,7 +643,6 @@ class Creator:
                 if reuse_ip and 'proxies' in user_data:
                     proxies = user_data['proxies']
                 else:proxies = Utils.format_proxy(random.choice(self.proxies))
-                proxies = Utils.format_proxy(random.choice(self.proxies))
 
                 if not new_user:
                     session.headers.update(user_data.get('headers', {}))
