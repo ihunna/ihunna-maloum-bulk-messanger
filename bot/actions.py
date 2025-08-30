@@ -249,7 +249,7 @@ class Creator:
 
                 async with session.get(
                     'https://api.maloum.com/content/discovery',
-                    params={'limit': f'{limit}', 'dsc_r': self.generate_sensor_data('dsc_r')},
+                    params={'limit': f'15', 'dsc_r': self.generate_sensor_data('dsc_r')},
                     proxy=proxies,
                     timeout=20
                 ) as response:
@@ -321,7 +321,7 @@ class Creator:
                             # prevent too many concurrent requests
                             async with semaphore:
                                 # random delay before hitting the endpoint
-                                await asyncio.sleep(random.uniform(3, 10))
+                                await asyncio.sleep(random.uniform(3, 5))
 
                                 async with session.get(
                                     f'https://api.maloum.com/posts/{post_id}/comments',
@@ -369,7 +369,7 @@ class Creator:
                         if error == '':
                             tb = traceback.format_exc()
                             return False, f'{post.get("_id")} failed to process comments | {error.__class__.__name__}: {str(error)}\n{tb}'
-                        return False, f'{post.get("_id")} failed to process comments | {str(error)} on {scraper.get("email")}'
+                        return False, f'{post.get("_id")} failed to process comments | {str(error)}'
 
                 tasks = [process_post(post) for post in posts]
                 results = await asyncio.gather(*tasks, return_exceptions=True)
