@@ -326,8 +326,7 @@ class Creator:
                                 async with session.get(
                                     f'https://api.maloum.com/posts/{post_id}/comments',
                                     params=params,
-                                    proxy='http://127.0.0.1:8080',
-                                    ssl=False,
+                                    proxy=proxies,
                                     timeout=60
                                 ) as response:
                                     if not response.ok:
