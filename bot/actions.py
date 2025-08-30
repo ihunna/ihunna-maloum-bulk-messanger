@@ -291,7 +291,7 @@ class Creator:
                             if _next is not None:
                                 params['next'] = _next
                             
-                            proxies = self.format_proxy(random.choice(self.proxies))
+                            # proxies = self.format_proxy(random.choice(self.proxies))
                             for key in ['x-client-info', 'x-supabase-api-version', 'apikey']:
                                 if key in session.headers:
                                     del session.headers[key]
@@ -1035,7 +1035,7 @@ class _MALOUM:
 
             Utils.write_log(f'=== Scraping started for {task_id} ===')
 
-            offset = 0
+            offset, i = 0, 0
             count = config.get('max_actions',10)
             last_activity = config.get('last_activity',7)
 
@@ -1046,7 +1046,7 @@ class _MALOUM:
                 if task_status['status'].lower() in ['cancelled', 'canceled']:
                     break
                 
-                target_scraper = random.choice(scrapers)
+                target_scraper = scrapers[i]
                 success, scraper = await Creator().login(
                     admin, 
                     target_scraper['email'], 
@@ -1090,6 +1090,7 @@ class _MALOUM:
                     await asyncio.sleep(sleep_time)
 
                 offset += count if offset < 400 else 0
+                i = i + 1 if i < len(scrapers) - 1 else 0
 
 
         except Cancelled as error:
