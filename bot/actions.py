@@ -226,14 +226,30 @@ class Creator:
             client_msg = {'msg': f'Scraping users by {scraper["id"]}', 'status': 'success', 'type': 'message'}
             success, msg = Utils.update_client(client_msg)
 
-            async with aiohttp.ClientSession(headers=scraper.get('headers')) as session:
+            headers = {
+                'accept': 'application/json',
+                'accept-language': 'en-US,en;q=0.9',
+                'authorization': scraper.get('headers').get('authorization'),
+                'origin': 'https://app.maloum.com',
+                'priority': 'u=1, i',
+                'referer': 'https://app.maloum.com/',
+                'sec-ch-ua': '"Not(A:Brand";v="99", "Google Chrome";v="133", "Chromium";v="133"',
+                'sec-ch-ua-mobile': '?1',
+                'sec-ch-ua-platform': '"Android"',
+                'sec-fetch-dest': 'empty',
+                'sec-fetch-mode': 'cors',
+                'sec-fetch-site': 'same-site',
+                'user-agent': Utils.generate_user_agent('android', 1),
+            }
+
+            async with aiohttp.ClientSession(headers=headers) as session:
                 # session.cookie_jar.update_cookies(scraper.get('cookies'))
                 proxies = scraper.get('proxies', Utils.format_proxy(random.choice(self.proxies))) \
                     if scraper.get('reuse_ip', True) else Utils.format_proxy(random.choice(self.proxies))
 
                 async with session.get(
                     'https://api.maloum.com/content/discovery',
-                    params={'limit': f'15', 'dsc_r': self.generate_sensor_data('dsc_r')},
+                    params={'limit': f'{limit}', 'dsc_r': self.generate_sensor_data('dsc_r')},
                     proxy=proxies,
                     timeout=20
                 ) as response:
@@ -267,9 +283,12 @@ class Creator:
 
                     candidate_users = []
 
+                semaphore = asyncio.Semaphore(3)  # allow max 3 requests at once
                 async def process_post(post):
                     try:
-                        time.sleep(random.randint(1,5))
+                        # # add an initial random delay so not all tasks fire at once
+                        # await asyncio.sleep(random.uniform(1, 5))
+
                         success, task_status = Utils.check_task_status(task_id)
                         if not success:
                             raise Exception(task_status)
@@ -279,70 +298,78 @@ class Creator:
                         post_id, comment_count, _next = post.get('_id'), post.get('commentCount'), None
                         if not post_id or comment_count is None:
                             raise Exception('Post ID or Comment count missing from post dict')
-                        
+
                         while comment_count > 0:
                             success, task_status = Utils.check_task_status(task_id)
                             if not success:
                                 raise Exception(task_status)
                             if task_status['status'].lower() in ['cancelled', 'canceled']:
                                 return False, 'Task canceled'
-                            
+
                             params = {'limit': '50'}
                             if _next is not None:
                                 params['next'] = _next
-                            
-                            # proxies = self.format_proxy(random.choice(self.proxies))
+
+                            # remove headers safely
                             for key in ['x-client-info', 'x-supabase-api-version', 'apikey']:
-                                if key in session.headers:
-                                    del session.headers[key]
+                                session.headers.pop(key, None)
+
                             session.headers.update({
                                 'user-agent': Utils.generate_user_agent('android', 1)
                             })
 
-                            async with session.get(
-                                f'https://api.maloum.com/posts/{post_id}/comments',
-                                params=params,
-                                proxy=proxies,
-                                timeout=60
-                            ) as response:
-                                if not response.ok:
-                                    raise Exception(f'could not get comment for post | {post_id} | {await response.text()}')
-                                
-                                data = await response.json()
-                                comments, _next = data.get('data', []), data.get('next')
-                                comment_count -= len(comments)
+                            # prevent too many concurrent requests
+                            async with semaphore:
+                                # random delay before hitting the endpoint
+                                await asyncio.sleep(random.uniform(3, 5))
 
-                                for comment in comments:
-                                    u = comment.get('user')
-                                    if not u:continue
+                                async with session.get(
+                                    f'https://api.maloum.com/posts/{post_id}/comments',
+                                    params=params,
+                                    proxy='http://127.0.0.1:8080',
+                                    ssl=False,
+                                    timeout=60
+                                ) as response:
+                                    if not response.ok:
+                                        raise Exception(
+                                            f'could not get comment for post | {post_id} | {await response.text()}'
+                                        )
 
-                                    user = {
-                                        "_id": u["_id"],
-                                        "username": u["username"],
-                                        "commented_at": comment.get("createdAt")
-                                    }
+                                    data = await response.json()
+                                    comments, _next = data.get('data', []), data.get('next')
+                                    comment_count -= len(comments)
 
-                                    if not u.get('isCreator', True):
-                                        async with lock:
-                                            if len(valid_users) >= count:
-                                                await flush_candidates()
-                                                return True, f'{post.get("commentCount")} processed for post {post_id}'
+                                    for comment in comments:
+                                        u = comment.get('user')
+                                        if not u:
+                                            continue
 
-                                            candidate_users.append(user)
-                                            if len(candidate_users) >= BATCH_SIZE:
-                                                await flush_candidates()
-                                            
-                                if not _next:
-                                    break
-                        
+                                        user = {
+                                            "_id": u["_id"],
+                                            "username": u["username"],
+                                            "commented_at": comment.get("createdAt")
+                                        }
+
+                                        if not u.get('isCreator', True):
+                                            async with lock:
+                                                if len(valid_users) >= count:
+                                                    await flush_candidates()
+                                                    return True, f'{post.get("commentCount")} processed for post {post_id}'
+
+                                                candidate_users.append(user)
+                                                if len(candidate_users) >= BATCH_SIZE:
+                                                    await flush_candidates()
+
+                                    if not _next:
+                                        break
+
                         await flush_candidates()
                         return True, f'{post.get("commentCount")} processed for post {post_id}'
-                    
+
                     except Exception as error:
-                        if error == '':
-                            tb = traceback.format_exc()
-                            return False, f'{post.get("_id")} failed to process comments | {error.__class__.__name__}: {str(error)}\n{tb}'
-                        else:return False, f'{post.get("_id")} failed to process comments | {str(error)}'
+                        tb = traceback.format_exc()
+                        return False, f'{post.get("_id")} failed to process comments | {error.__class__.__name__}: {str(error)}\n{tb}'
+
                 
                 tasks = [process_post(post) for post in posts]
                 results = await asyncio.gather(*tasks, return_exceptions=True)
