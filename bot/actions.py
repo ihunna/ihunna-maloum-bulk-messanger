@@ -180,6 +180,7 @@ class Creator:
         }
         self._message_cache = {}  # Cache for recent recipients per creator
         self.scraped_cache = []
+        self.categories = Utils.load_categories()
         
     def format_proxy(self,proxies):
         return proxies['http']
@@ -247,6 +248,29 @@ class Creator:
                 proxies = scraper.get('proxies', Utils.format_proxy(random.choice(self.proxies))) \
                     if scraper.get('reuse_ip', True) else Utils.format_proxy(random.choice(self.proxies))
 
+                #Set random preferences
+                cat = random.choice(self.categories)
+                json_data = {
+                    'categories': [
+                        cat.get('_id'),
+                    ],
+                    'sexualPreferences': [
+                            '141400000000000000002000',
+                        ],
+                    }
+                async with session.patch(
+                    'https://api.maloum.com/users/current/preferences',
+                    json=json_data,
+                    proxy=proxies,
+                    timeout=60
+                ) as response:
+                    if not response.ok:
+                        raise Exception(f'Error setting preferences: {await response.text()}')
+                    client_msg = {'msg': f'Category preferences set to {cat.get('name')}', 'status': 'success', 'type': 'message'}
+                    Utils.update_client(client_msg)
+
+                    Utils.write_log(f"--- Category preferences set to {cat.get('name')} ---")
+
                 async with session.get(
                     'https://api.maloum.com/content/discovery',
                     params={'limit': f'30', 'dsc_r': self.generate_sensor_data('dsc_r')},
@@ -257,6 +281,8 @@ class Creator:
                         raise Exception(f'Could not get posts: {await response.text()}')
                     posts = (await response.json()).get('data', [])
 
+                total_creators = 0
+                total_existing = 0
                 valid_users = []
                 candidate_users = []
                 BATCH_SIZE = 100
@@ -267,21 +293,29 @@ class Creator:
                     if not candidate_users:
                         return
 
-                    ids = [u["_id"] for u in candidate_users]
-                    success, existing_ids = Utils.get_existing_user_ids(ids, admin=admin)
-                    if not success:
-                        Utils.write_log(f"DB check failed: {existing_ids}")
-                        candidate_users = []
-                        return
+                    while candidate_users:
+                        batch = candidate_users[:BATCH_SIZE]
+                        candidate_users = candidate_users[BATCH_SIZE:]
 
-                    new_users = [u for u in candidate_users if u["_id"] not in existing_ids]
+                        batch_ids = [u["_id"] for u in batch]
 
-                    if new_users:
-                        success, msg = Utils.add_users(new_users, admin=admin, task_id=task_id)
-                        if not success:Utils.write_log(f"Insert failed: {msg}")
-                        else:valid_users.extend(new_users)
+                        success, existing_ids = Utils.get_existing_user_ids(batch_ids, admin=admin)
+                        if not success:
+                            Utils.write_log(f"DB check failed: {existing_ids}")
+                            return
 
-                    candidate_users = []
+                        new_users = [u for u in batch if u["_id"] not in existing_ids]
+
+                        if new_users:
+                            success, msg = Utils.add_users(new_users, admin=admin, task_id=task_id)
+                            if not success:Utils.write_log(f"Insert failed: {msg}")
+                            else:valid_users.extend(new_users)
+
+                        if existing_ids:
+                            client_msg = {'msg': f'Skipped {len(existing_ids)} users because they already exist in the database', 'status': 'success', 'type': 'message'}
+                            Utils.update_client(client_msg)
+                            total_existing += len(existing_ids)
+
 
                 semaphore = asyncio.Semaphore(3)  # allow max 3 requests at once
                 async def process_post(post):
@@ -298,6 +332,8 @@ class Creator:
                         post_id, comment_count, _next = post.get('_id'), post.get('commentCount'), None
                         if not post_id or comment_count is None:
                             raise Exception('Post ID or Comment count missing from post dict')
+
+                        creators = []
 
                         while comment_count > 0:
                             success, task_status = Utils.check_task_status(task_id)
@@ -338,6 +374,8 @@ class Creator:
                                     comments, _next = data.get('data', []), data.get('next')
                                     comment_count -= len(comments)
 
+                                    creators = [c for c in comments if c.get('user', {}).get('isCreator', False)]
+                                    
                                     for comment in comments:
                                         u = comment.get('user')
                                         if not u:
@@ -351,18 +389,22 @@ class Creator:
 
                                         if not u.get('isCreator', True):
                                             async with lock:
-                                                if len(valid_users) >= count:
-                                                    await flush_candidates()
-                                                    return True, f'{post.get("commentCount")} processed for post {post_id}'
+                                                # if len(valid_users) >= count:
+                                                #     await flush_candidates()
+                                                #     return True, f'{post.get("commentCount")} processed for post {post_id}'
 
                                                 candidate_users.append(user)
-                                                if len(candidate_users) >= BATCH_SIZE:
-                                                    await flush_candidates()
-
-                                    if not _next:
-                                        break
+                                                # if len(candidate_users) >= BATCH_SIZE:
+                                                #     await flush_candidates()
+                                    if not _next:break
 
                         await flush_candidates()
+
+                        if len(creators) > 0:
+                            client_msg = {'msg': f"Skipped {len(creators)} creators on post {post_id}", 'status': 'success', 'type': 'message'}
+                            Utils.update_client(client_msg)
+                            total_creators += len(creators)
+
                         return True, f'{post.get("commentCount")} processed for post {post_id}'
 
                     except Exception as error:
@@ -378,9 +420,11 @@ class Creator:
                         Utils.write_log(result)
                     elif isinstance(result, tuple) and not result[0]:
                         Utils.write_log(result[1])
-                
+
+                if not valid_users and (total_creators > 0 or total_existing > 0):
+                    raise Exception(f'No users found | Because {total_creators} creators were skipped and {total_existing} existing users already exist in the database')
                 if not valid_users:
-                    raise Exception('No users found')
+                    return False, f'No valid users found for {scraper["id"]}'
                 return True, f'Scraped {len(valid_users)} users by {scraper["id"]}'
 
         except Exception as e:

@@ -49,6 +49,13 @@ class Utils:
                 'https':proxies
             }
         return None
+    
+    @staticmethod
+    def load_categories():
+        file = os.path.join(root_dir,'universals','categories.json')
+        with open(file,"r") as f:
+            categories = json.load(f)
+        return categories
 
     @staticmethod
     def generate_android_version():
