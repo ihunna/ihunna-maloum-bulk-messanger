@@ -273,7 +273,7 @@ class Creator:
 
                 async with session.get(
                     'https://api.maloum.com/content/discovery',
-                    params={'limit': f'30', 'dsc_r': self.generate_sensor_data('dsc_r')},
+                    params={'limit': f'25', 'dsc_r': self.generate_sensor_data('dsc_r')},
                     proxy=proxies,
                     timeout=20
                 ) as response:
@@ -317,9 +317,10 @@ class Creator:
                             total_existing += len(existing_ids)
 
 
-                semaphore = asyncio.Semaphore(2)  # allow max 3 requests at once
+                semaphore = asyncio.Semaphore(3)  # allow max 3 requests at once
                 async def process_post(post):
                     try:
+                        nonlocal total_creators, total_existing, candidate_users, valid_users
                         # # add an initial random delay so not all tasks fire at once
                         # await asyncio.sleep(random.uniform(1, 5))
 
