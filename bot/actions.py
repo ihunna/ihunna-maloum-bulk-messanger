@@ -317,7 +317,7 @@ class Creator:
                             total_existing += len(existing_ids)
 
 
-                semaphore = asyncio.Semaphore(3)  # allow max 3 requests at once
+                semaphore = asyncio.Semaphore(2)  # allow max 3 requests at once
                 async def process_post(post):
                     try:
                         # # add an initial random delay so not all tasks fire at once
