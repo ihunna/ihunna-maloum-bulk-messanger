@@ -289,7 +289,7 @@ class Creator:
                 lock = asyncio.Lock()
 
                 async def flush_candidates():
-                    nonlocal candidate_users, valid_users
+                    nonlocal candidate_users, valid_users, total_creators, total_existing
                     if not candidate_users:
                         return
 
