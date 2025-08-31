@@ -774,7 +774,7 @@ class Utils:
         conn = sqlite3.connect(db_file)
         cursor = conn.cursor()
         try:
-            cursor.execute("INSERT INTO users (id, admin, username, commented_at, task_id) VALUES (?, ?, ?, ?, ?)", (user_id,admin,username,commented_at,task_id))
+            cursor.execute("INSERT INTO users (id, admin, username, commented_at, task_id) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING", (user_id,admin,username,commented_at,task_id))
             conn.commit()
             
             success,msg = True, 'User added successfully'
