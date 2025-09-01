@@ -528,7 +528,10 @@ class Creator:
                             if not response.ok:
                                 err_text = await response.text()
                                 Utils.write_log(f"--- Failed to create chat for user {username}: {err_text} ---")
-                                client_msg = {'msg': f"Failed to create chat for user {username}: {err_text}", 'status': 'error', 'type': 'message'}
+                                if response.status == 404:
+                                    client_msg = {'msg': f"This user {username} no longer exists, skipping it", 'status': 'success', 'type': 'message'}
+                                else:
+                                    client_msg = {'msg': f"Failed to create chat for user {username}: {err_text}", 'status': 'error', 'type': 'message'}
                                 success, msg = Utils.update_client(client_msg)
                                 continue
                             
