@@ -522,8 +522,7 @@ class Creator:
                         async with session.post(
                             'https://api.maloum.com/chats',
                             json={'member2': recipient_id},
-                            proxy='http://127.0.0.1:8080',
-                            
+                            proxy=proxies,
                             timeout=20
                         ) as response:
                             if not response.ok:
