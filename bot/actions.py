@@ -522,7 +522,8 @@ class Creator:
                         async with session.post(
                             'https://api.maloum.com/chats',
                             json={'member2': recipient_id},
-                            proxy=proxies,
+                            proxy='http://127.0.0.1:8080',
+                            
                             timeout=20
                         ) as response:
                             if not response.ok:
@@ -530,6 +531,8 @@ class Creator:
                                 Utils.write_log(f"--- Failed to create chat for user {username}: {err_text} ---")
                                 if response.status == 404:
                                     client_msg = {'msg': f"This user {username} no longer exists, skipping it", 'status': 'success', 'type': 'message'}
+                                    success, msg = Utils.update_user(recipient_id, 'inactive')
+                                    if not success:Utils.write_log(f"--- Failed to mark user {username} as inactive: {msg} ---")
                                 else:
                                     client_msg = {'msg': f"Failed to create chat for user {username}: {err_text}", 'status': 'error', 'type': 'message'}
                                 success, msg = Utils.update_client(client_msg)

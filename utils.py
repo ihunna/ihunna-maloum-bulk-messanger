@@ -182,6 +182,7 @@ class Utils:
                     username TEXT,
                     commented_at TEXT,
                     task_id TEXT,
+                    status TEXT DEFAULT 'active',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )''')
             
@@ -784,6 +785,22 @@ class Utils:
             conn.close()
             return success,msg
         
+    @staticmethod
+    def update_user(user_id,status):
+        success,msg = False,''
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE users SET status = ? WHERE id = ?", (status, user_id))
+            conn.commit()
+
+            success,msg = True, 'User updated successfully'
+        except Exception as error:
+            success,msg =  False, str(f'Error updating user :{error}')
+        finally:
+            conn.close()
+            return success,msg
+        
 
     @staticmethod
     def delete_user(user_id):
@@ -898,7 +915,8 @@ class Utils:
             cursor.execute("""
                 SELECT u.id, u.username
                 FROM users u
-                WHERE u.id NOT IN (
+                WHERE u.status = 'active'
+                AND u.id NOT IN (
                     SELECT m.recipient_id
                     FROM messages m
                     WHERE m.creator_id = ?
