@@ -374,6 +374,80 @@ def creator():
         Utils.write_log(str(error))
         abort(500)
 
+
+@app.route('/targets', methods=['GET'])
+@login_required
+def targets():
+    try:
+        category = request.args.get('category', 'all')
+        g.page = category
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
+        action = request.args.get('action')
+
+        admin = session['USER']['id']
+        offset = (page - 1) * per_page
+
+        if action == 'get-items':
+            item = request.args.get('item')
+            constraint = request.args.get('key')
+
+            if constraint == 'admin':
+                constraint, item = None, None
+
+            success, targets, total_targets = Utils.get_targets(
+                admin=admin,
+                limit=per_page, 
+                offset=offset,
+                category=category,
+                constraint=constraint,
+                keyword=item
+            )
+
+            next_page = page + 1 if page < total_targets / per_page else page
+            prev_page = page - 1 if page > 1 else page
+            current_page = offset + len(targets)
+
+            params = f'action=get-items&item={item}&key={constraint}'
+
+            next_page = f'{next_page}&{params}'
+            prev_page = f'{prev_page}&{params}'
+
+            if success:
+                return render_template(
+                    'targets.html', 
+                    action=action, 
+                    targets=targets,
+                    total_targets=total_targets,
+                    next_page=next_page,
+                    prev_page=prev_page,
+                    current_page=current_page
+                    )
+
+            Utils.write_log(targets)
+            return render_template('view-item.html', action=404)
+
+        success, targets, total_targets = Utils.get_targets(admin=admin, limit=per_page, offset=offset, category=category)
+
+        if success:
+            next_page = page + 1 if page < total_targets / per_page else page
+            prev_page = page - 1 if page > 1 else page
+            current_page = offset + len(targets)
+            return render_template(
+                'targets.html', 
+                targets=targets,
+                total_targets=total_targets,
+                next_page=next_page,
+                prev_page=prev_page,
+                current_page=current_page
+                )
+        else:
+            Utils.write_log(targets)
+            return render_template('view-item.html', action=404)
+    except Exception as error:
+        Utils.write_log(error)
+        abort(500)
+
 @app.route('/messages', methods=['GET'])
 @login_required
 def messages():

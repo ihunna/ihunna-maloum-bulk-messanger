@@ -921,6 +921,7 @@ class Utils:
                     FROM messages m
                     WHERE m.creator_id = ?
                 )
+                ORDER BY u.created_at DESC
                 LIMIT ? OFFSET ?
             """, (creator_id, limit, offset))
 

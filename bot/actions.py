@@ -476,25 +476,31 @@ class Creator:
                         raise ValueError('Captions cannot be empty')
 
             # NOTE: scraping is handled elsewhere now; this function only pulls from DB
-            client_msg = {'msg': f'Fetching users from DB (unmessaged by {creator_name})', 'status': 'success', 'type': 'message'}
+            offset = creator_data.get('message_offset', 0)
+            client_msg = {'msg': f'Fetching users from DB (unmessaged by {creator_name}) offset {offset}', 'status': 'success', 'type': 'message'}
             success, msg = Utils.update_client(client_msg)
+
+            Utils.write_log(f"--- Fetching users from DB (unmessaged by {creator_name}) offset {offset} ---")
 
             async with aiohttp.ClientSession() as session:
                 session.headers.update(creator_data.get('headers'))
                 session.cookie_jar.update_cookies(creator_data.get('cookies'))
-                proxies = creator.get('proxies', Utils.format_proxy(random.choice(self.proxies))) if creator.get('reuse_ip', True) else Utils.format_proxy(random.choice(self.proxies))
+                proxies = creator_data.get('proxies', Utils.format_proxy(random.choice(self.proxies))) if creator_data.get('reuse_ip', True) else Utils.format_proxy(random.choice(self.proxies))
 
-                offset, limit = 0, max_actions
+                limit = max_actions
                 users, found_users = [], 0
+
+                success, msg, total_users = Utils.get_users(admin)
+                if not success:raise Exception(msg)
+
+                if offset >= total_users:offset = 0
 
                 # 🔁 Pull only users NOT previously messaged by this creator (from DB)
                 while found_users < max_actions:
                     # expects you have Utils.get_unmessaged_users(creator_id, limit, offset) implemented
-                    ok, new_users = Utils.get_unmessaged_users(creator_internal_id, limit=limit, offset=offset)
-                    if not ok:
-                        raise Exception(new_users)
-                    if not new_users:
-                        break
+                    success, new_users = Utils.get_unmessaged_users(creator_internal_id, limit=limit, offset=offset)
+                    if not success:raise Exception(new_users)
+                    if not new_users:break
 
                     users.extend(new_users)
                     found_users += len(new_users)
@@ -691,7 +697,11 @@ class Creator:
                         client_msg = {'msg': f'Failed to message user {username}: {e}', 'status': 'error', 'type': 'message'}
                         success, _ = Utils.update_client(client_msg)
                         continue
-
+            
+            # Update creator's message offset
+            success, msg = self.update(creator, {'message_offset': offset})
+            if not success:Utils.write_log(msg)
+            
             if success_messages > 0:
                 return True, f'Successfully sent messages to {success_messages} users by {creator_name}'
             else:
@@ -1023,18 +1033,19 @@ class _MALOUM:
 
                 for success, result in results:
                     if not success:
-                        client_msg = {'msg': f'Error messaging creators on {task_id}: {result}', 'status': 'error', 'type': 'message'}
+                        client_msg = {'msg': f'Error messaging users on {task_id}: {result}', 'status': 'error', 'type': 'message'}
                         success, msg = Utils.update_client(client_msg)
-                        if not success:
-                            Utils.write_log(msg)
+                    else:
+                        client_msg = {'msg': f'Success messaging users on {task_id}: {result}', 'status': 'success', 'type': 'message'}
+                        success, msg = Utils.update_client(client_msg)
+
                     Utils.write_log(f'=== {result} ===')
 
                 wait_message = f'Waiting for {time_message[str(time_between)]} before sending another batch of messages'
                 Utils.write_log(wait_message)
+
                 client_msg = {'msg': wait_message, 'status': 'success', 'type': 'message'}
                 success, msg = Utils.update_client(client_msg)
-                if not success:
-                    Utils.write_log(msg)
                 
                 sleep_time = 10
                 for _ in range(int(time_between / sleep_time)):

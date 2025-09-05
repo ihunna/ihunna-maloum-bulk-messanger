@@ -16,21 +16,6 @@
         .message-holder:not(:last-child){
             margin-top: 50px;
         }
-        .task-tab{
-            display: flex;
-            padding-bottom: 10px;
-        }
-        .task-tab a{
-            margin-left: auto;
-            background: var(--secondary);
-            padding: 10px;
-            font-size: .8rem;
-            border-radius: 5px;
-        }
-
-        .task-tab a:hover{
-            background: none;
-        }
 
         .input-container{
             width: 100%;
@@ -81,7 +66,7 @@
     {%if action == 'start-messaging'%}
         <section class="add-message">
             <div class="holder form-holder">
-                    <div class="task-tab">
+                    <div class="alt-tab">
                         <a href="{{url_for('scraper')}}">Scraper <i class="fas fa-arrow-right"></i></a>
                     </div>
                     <form action="" id="messages-form" data-action="Create message" 
@@ -324,7 +309,7 @@
     {%elif action == 'start-scraping'%}
         <section class="add-scraper">
             <div class="holder form-holder">
-                    <div class="task-tab">
+                    <div class="alt-tab">
                         <a href="{{url_for('messages', action='start-messaging')}}">Messanger <i class="fas fa-arrow-right"></i></a>
                     </div>
                     <form action="" id="scraper-form" data-action="Scrape accounts" 

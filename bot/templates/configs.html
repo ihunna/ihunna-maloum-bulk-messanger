@@ -110,7 +110,7 @@ Configs
                             Comments
                         </a>
                     </li> -->
-                    {%if category in ['creators','users']%}
+                    {%if category in ['creators','users', 'targets']%}
                         <li class="active">
                             <a href="{{ url_for('files', category=category) }}">
                                 Add {{category}}
