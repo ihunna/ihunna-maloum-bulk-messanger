@@ -380,7 +380,7 @@ def creator():
 def targets():
     try:
         category = request.args.get('category', 'all')
-        g.page = category
+        g.page = 'users'
         page = request.args.get('page', 1, type=int)
         per_page = 20
         action = request.args.get('action')
@@ -399,7 +399,6 @@ def targets():
                 admin=admin,
                 limit=per_page, 
                 offset=offset,
-                category=category,
                 constraint=constraint,
                 keyword=item
             )
@@ -439,7 +438,8 @@ def targets():
                 total_targets=total_targets,
                 next_page=next_page,
                 prev_page=prev_page,
-                current_page=current_page
+                current_page=current_page,
+                category=category
                 )
         else:
             Utils.write_log(targets)

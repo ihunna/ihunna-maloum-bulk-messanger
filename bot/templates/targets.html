@@ -9,18 +9,20 @@
         </div>
         <div class="configs-nav scroll scroll-h">
             <ul>
-                <li>
-                    <a class="{%if category=='all'%} active {%endif%}" href="{{ url_for('targets') }}">
+                <li class="{%if category=='all'%} active {%endif%}">
+                    <a  href="{{ url_for('targets') }}">
                         All
                     </a>
                 </li>
-                <li>
-                    <a class="{%if category=='uploaded'%} active {%endif%}" href="{{ url_for('targets', category='uploaded') }}">
+                <li class="{%if category=='uploaded'%} active {%endif%}">
+                    <a  
+                        href="{{ url_for('targets', category='uploaded') }}">
                         Uploaded
                     </a>
                 </li>
-                <li>
-                    <a class="{%if category=='scraped'%} active {%endif%}" href="{{ url_for('targets', category='scraped') }}">
+                <li class="{%if category=='scraped'%} active {%endif%}">
+                    <a 
+                        href="{{ url_for('targets', category='scraped') }}">
                         Scraped
                     </a>
                 </li>
