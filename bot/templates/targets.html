@@ -39,26 +39,32 @@
                         <input type="checkbox" id="check-all" onclick="selectAll(this,'targets-table')">
                     </div>              
                     <div class="table-cell badge">Username</div>
-                    <div class="table-cell double-cell">Last login</div>
-                    <div class="table-cell double-cell">Created on</div>
+                    <div class="table-cell badge">Status</div>
+                    <div class="table-cell">Spent</div>
+                    <div class="table-cell">Source</div>
+                    <div class="table-cell double-cell">Created at</div>
                     <div class="table-cell actions">Actions</div>
                     </div>
                 </div>
                <div class="table-body">
                     {%for target in targets%}
-                        {%set target_data = target.data%}
-                        {%set target_details = target_data.details.user%}
-                        <div data-action-url="{{ url_for('target',action='view-item',user=target.id,category='targets') }}" 
+                        <div 
                             class="table-row" data-item="{{target.id}}" data-action-target="{{target.id}}" id="{{target.id}}">
                             <div class="table-cell check-box">
                                 <input type="checkbox" class="checkbox-row">
                             </div>
                             <div class="table-cell badge">
                                 <span class="bg-success">
-                                    {{target_details.username|capitalize}}
+                                    {{target.username|capitalize}}
+                                </span>
+                            </div> 
+                             <div class="table-cell badge">
+                                <span class="{%if target.status == 'active' %} bg-success {% elif target.status == 'inactive' %} bg-danger {% else %} bg-warning {% endif %}">
+                                    {{target.status}}
                                 </span>
                             </div>
-                            <div class="table-cell double-cell">{{target_details.last_login | datetime}}</div>                             
+                            <div class="table-cell">{{ target.spent}}</div>
+                            <div class="table-cell">{{ target.category}}</div>
                             <div class="table-cell double-cell">{{ target.created_at}}</div>
                             <div class="table-cell actions">
                                 <ul class="actions-list">

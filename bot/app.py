@@ -395,7 +395,7 @@ def targets():
             if constraint == 'admin':
                 constraint, item = None, None
 
-            success, targets, total_targets = Utils.get_targets(
+            success, targets, total_targets = Utils.get_users(
                 admin=admin,
                 limit=per_page, 
                 offset=offset,
@@ -427,7 +427,7 @@ def targets():
             Utils.write_log(targets)
             return render_template('view-item.html', action=404)
 
-        success, targets, total_targets = Utils.get_targets(admin=admin, limit=per_page, offset=offset, category=category)
+        success, targets, total_targets = Utils.get_users(admin=admin, limit=per_page, offset=offset, category=category)
 
         if success:
             next_page = page + 1 if page < total_targets / per_page else page

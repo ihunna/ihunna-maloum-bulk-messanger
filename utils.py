@@ -182,8 +182,10 @@ class Utils:
                     username TEXT,
                     commented_at TEXT,
                     task_id TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     status TEXT DEFAULT 'active',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    spent INTEGER DEFAULT 0,
+                    category TEXT DEFAULT 'scraped'
                 )''')
             
             conn.commit()
@@ -822,7 +824,7 @@ class Utils:
         
 
     @staticmethod
-    def get_users(admin, limit=20, offset=0, constraint=None, keyword=None):
+    def get_users(admin, limit=20, offset=0, constraint=None, keyword=None, category=None):
         success, users, total_users = True, [], 0
         conn = sqlite3.connect(db_file)
         cursor = conn.cursor()
@@ -842,27 +844,39 @@ class Utils:
 
                 users = [{
                     'id': row[0], 
-                    'status': row[1], 
-                    'admin':row[2],
+                    'admin':row[1],
+                    'username': row[2], 
                     'commented_at':row[3],
                     'task_id':row[4],
-                    'created_at': row[5]
+                    'created_at': row[5],
+                    'status': row[6],
+                    'spent': row[7],
+                    'category': row[8]
                     } for row in rows]
             else:
+                if category in ['scraped','uploaded']:
+                    cursor.execute("SELECT COUNT(*) FROM users WHERE admin = ? AND category = ?", (admin, category))
+                    total_users = cursor.fetchone()[0]
 
-                cursor.execute("SELECT COUNT(*) FROM users WHERE admin = ?", (admin,))
-                total_users = cursor.fetchone()[0]
+                    cursor.execute("SELECT * FROM users WHERE admin = ? AND category = ? ORDER BY created_at DESC LIMIT ? OFFSET ?", (admin, category, limit, offset))
+                    rows = cursor.fetchall()
+                else:
+                    cursor.execute("SELECT COUNT(*) FROM users WHERE admin = ?", (admin,))
+                    total_users = cursor.fetchone()[0]
 
-                cursor.execute("SELECT * FROM users WHERE admin = ? ORDER BY created_at DESC LIMIT ? OFFSET ?", (admin, limit, offset))
-                rows = cursor.fetchall()
+                    cursor.execute("SELECT * FROM users WHERE admin = ? ORDER BY created_at DESC LIMIT ? OFFSET ?", (admin, limit, offset))
+                    rows = cursor.fetchall()
 
                 users = [{
                     'id': row[0], 
-                    'status': row[1], 
-                    'admin':row[2],
+                    'admin':row[1],
+                    'username': row[2], 
                     'commented_at':row[3],
                     'task_id':row[4],
-                    'created_at': row[5]
+                    'created_at': row[5],
+                    'status': row[6],
+                    'spent': row[7],
+                    'category': row[8]
                     } for row in rows]
 
         except Exception as error:
