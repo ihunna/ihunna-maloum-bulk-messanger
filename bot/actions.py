@@ -508,6 +508,8 @@ class Creator:
 
                 success_messages = 0
 
+                random.shuffle(users)
+
                 for user in users:
                     try:
                         # Check cancel
