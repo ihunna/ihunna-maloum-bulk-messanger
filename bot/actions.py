@@ -749,34 +749,37 @@ class Creator:
                         proxy=proxies,
                         timeout=60
                     ) as response:
-                        if not response.ok:raise Exception(f'could not refresh access token with refresh token {refresh_token} {response.text}')
-                        login_data = await response.json()
-                        token, refresh_token = login_data['access_token'], login_data['refresh_token']
-                        if category == 'creators':Utils.write_log(f'token after refresh {token}')
+                        if not response.ok:
+                            Utils.write_log(f'could not refresh access token with refresh token {refresh_token} {await response.text} moving on with proper login')
                         
-                        session.headers.update({
-                            'authorization': f'Bearer {token}'
-                        })
+                        else:
+                            login_data = await response.json()
+                            token, refresh_token = login_data['access_token'], login_data['refresh_token']
+                            if category == 'creators':Utils.write_log(f'token after refresh {token}')
+                            
+                            session.headers.update({
+                                'authorization': f'Bearer {token}'
+                            })
 
-                        user_data['details']['user'].update({
-                            'accessToken':token,
-                            'refreshToken':refresh_token,
-                            'last_login':login_data.get('user',{}).get('last_sign_in_at')
-                        })
-                        user_data.update({
-                            'headers':dict(session.headers),
-                            'proxies':proxies
-                        })
+                            user_data['details']['user'].update({
+                                'accessToken':token,
+                                'refreshToken':refresh_token,
+                                'last_login':login_data.get('user',{}).get('last_sign_in_at')
+                            })
+                            user_data.update({
+                                'headers':dict(session.headers),
+                                'proxies':proxies
+                            })
 
-                        user_data['cookies'] = {
-                            key: str(value) for key, value in session.cookie_jar.filter_cookies('https://api.maloum.com').items()
-                        }
+                            user_data['cookies'] = {
+                                key: str(value) for key, value in session.cookie_jar.filter_cookies('https://api.maloum.com').items()
+                            }
 
-                        success, msg = Utils.update_creator(creator_id, email, user_data)
-                        if not success:raise Exception(msg)
-                        await session.close()
-                        user_data['id'] = creator_id
-                        return True, user_data
+                            success, msg = Utils.update_creator(creator_id, email, user_data)
+                            if not success:raise Exception(msg)
+                            await session.close()
+                            user_data['id'] = creator_id
+                            return True, user_data
 
 
                 session.headers.update(self.headers)
