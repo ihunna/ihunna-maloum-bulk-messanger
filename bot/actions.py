@@ -750,7 +750,7 @@ class Creator:
                         timeout=60
                     ) as response:
                         if not response.ok:
-                            Utils.write_log(f'could not refresh access token with refresh token {refresh_token} {await response.text} moving on with proper login')
+                            Utils.write_log(f'could not refresh access token with refresh token {refresh_token} {await response.text()} moving on with proper login')
                         
                         else:
                             login_data = await response.json()
@@ -873,8 +873,8 @@ class Creator:
 
             except Exception as e:
                 tb = traceback.format_exc()
-                Utils.write_log(f'Error logging in {e} on {email}')
-                return False, f'Error logging in {e} on {email} {e.__class__.__name__}: {str(e)}\n{tb}'
+                Utils.write_log(f'Error in login {e} on {email}')
+                return False, f'Error in login {e} on {email} {e.__class__.__name__}: {str(e)}\n{tb}'
             
     def update(self,user:dict,data:dict):
         try:
