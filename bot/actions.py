@@ -732,6 +732,7 @@ class Creator:
                 if reuse_ip and 'proxies' in user_data:
                     proxies = user_data['proxies']
                 else:proxies = Utils.format_proxy(random.choice(self.proxies))
+                proxies = Utils.format_proxy(random.choice(self.proxies))
 
                 if not new_user:
                     session.headers.update(user_data.get('headers', {}))
@@ -785,7 +786,7 @@ class Creator:
                     'https://api.maloum.com/user-management/login',
                     json={'usernameOrEmail': email, 'password': password},
                     proxy=proxies,
-                    timeout=20
+                    timeout=60
                 ) as response:
                     if response.status == 401:
                         return True, 'Credentials not correct'
@@ -805,7 +806,7 @@ class Creator:
                     async with session.get(
                         'https://srswgacczfgjttwdpuia.supabase.co/auth/v1/user',
                         proxy=proxies,
-                        timeout=20
+                        timeout=60
                     ) as response:
                         if not response.ok:
                             raise Exception('Could not get user account creds')
@@ -814,7 +815,7 @@ class Creator:
                     async with session.get(
                         'https://api.maloum.com/users/current',
                         proxy=proxies,
-                        timeout=20
+                        timeout=60
                     ) as response:
                         if not response.ok:
                             raise Exception('Could not get user current creds')
@@ -825,7 +826,7 @@ class Creator:
                         async with session.get(
                             f'https://api.maloum.com/users/{account["username"]}/profile',
                             proxy=proxies,
-                            timeout=20
+                            timeout=60
                         ) as response:
                             if not response.ok:
                                 raise Exception('Could not get user profile details')
