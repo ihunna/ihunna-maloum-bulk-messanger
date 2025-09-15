@@ -868,13 +868,9 @@ class Creator:
                     return True, user_data
 
             except Exception as e:
-                if e == '':
-                    tb = traceback.format_exc()
-                    return False, f'Error logging in {e} on {email} {e.__class__.__name__}: {str(e)}\n{tb}'
-                else:
-                    Utils.write_log(f'Error logging in {e} on {email}')
-                    return False,  f'Error logging in {e} on {email}'
-                
+                tb = traceback.format_exc()
+                Utils.write_log(f'Error logging in {e} on {email}')
+                return False, f'Error logging in {e} on {email} {e.__class__.__name__}: {str(e)}\n{tb}'
             
     def update(self,user:dict,data:dict):
         try:
