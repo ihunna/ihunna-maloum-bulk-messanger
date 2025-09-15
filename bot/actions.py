@@ -732,7 +732,6 @@ class Creator:
                 if reuse_ip and 'proxies' in user_data:
                     proxies = user_data['proxies']
                 else:proxies = Utils.format_proxy(random.choice(self.proxies))
-                proxies = Utils.format_proxy(random.choice(self.proxies))
 
                 if not new_user:
                     session.headers.update(user_data.get('headers', {}))
@@ -749,7 +748,7 @@ class Creator:
                         proxy=proxies,
                         timeout=60
                     ) as response:
-                        if not response.ok:raise Exception(f'could not refresh access token with refresh token {refresh_token}')
+                        if not response.ok:raise Exception(f'could not refresh access token with refresh token {refresh_token} {response.text}')
                         login_data = await response.json()
                         token, refresh_token = login_data['access_token'], login_data['refresh_token']
                         if category == 'creators':Utils.write_log(f'token after refresh {token}')
@@ -869,9 +868,13 @@ class Creator:
                     return True, user_data
 
             except Exception as e:
-                tb = traceback.format_exc()
-                Utils.write_log(f'Error logging in {e} on {email}')
-                return False, f'Error logging in {e} on {email} {e.__class__.__name__}: {str(e)}\n{tb}'
+                if e == '':
+                    tb = traceback.format_exc()
+                    return False, f'Error logging in {e} on {email} {e.__class__.__name__}: {str(e)}\n{tb}'
+                else:
+                    Utils.write_log(f'Error logging in {e} on {email}')
+                    return False,  f'Error logging in {e} on {email}'
+                
             
     def update(self,user:dict,data:dict):
         try:
