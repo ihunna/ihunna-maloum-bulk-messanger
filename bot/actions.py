@@ -510,6 +510,9 @@ class Creator:
 
                 random.shuffle(users)
 
+                if len(users) == 0:
+                    return False, f'No unmessaged users found for {creator_name} at offset {offset}'
+
                 for user in users:
                     try:
                         # Check cancel
