@@ -110,6 +110,10 @@
                     {%endif%}
                   </div>
             </div>
+            <form action="{{ url_for('creator') }}" id="reset-offset-form">
+                <input type="hidden" value="{{creator_id}}" name="creator-id">
+                <button type="submit" class="bg-success">Reset offset</button>
+            </form>
             <form action="{{ url_for('creator') }}" id="update-media-form">
                 <input type="text" value="{{post_id}}" name="post-id">
                 <input type="hidden" value="{{creator_id}}" name="creator-id">
@@ -117,8 +121,10 @@
             </form>
             <script>
                 document.addEventListener('DOMContentLoaded', function() {
-                    const form = document.getElementById('update-media-form');
-                    if (form) updateMediaId(form);
+                    const updateMediaIdForm = document.getElementById('update-media-form');
+                    const resetOffsetForm = document.getElementById('reset-offset-form');
+                    if (resetOffsetForm) resetOffset(resetOffsetForm);
+                    else if (updateMediaIdForm) updateMediaId(updateMediaIdForm);
                 });
             </script>
         </div>

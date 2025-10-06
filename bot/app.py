@@ -354,6 +354,15 @@ def creator():
                     return jsonify({'msg': 'Error updating user'}), 400
                 else:
                     return jsonify({'msg': 'User updated successfully'}), 200
+                
+            if action == 'reset-offset':
+                data = {'message_offset': 0}
+                success, msg = Creator().update(creator, data)
+                if not success:
+                    Utils.write_log(msg)
+                    return jsonify({'msg': 'Error updating user'}), 400
+                else:
+                    return jsonify({'msg': 'User updated successfully'}), 200
             
             elif action == 'update-media-id':
                 post_id = data['post_id']

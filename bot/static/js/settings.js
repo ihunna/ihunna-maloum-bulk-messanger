@@ -425,6 +425,40 @@ const search = async (searchForm,searchOffset,page,order) =>{
     }
 }
 
+const resetOffset = (form) => {
+    form.addEventListener('submit', async e => {
+        e.preventDefault();
+        const formData = new FormData(form);
+        const mediaId = formData.get('post-id');
+        const creatorId = formData.get('creator-id');
+        const actionUrl = form.getAttribute('action') || '/creator';
+
+        try {
+            toogleLoader('show', 'Resetting offset...');
+            const response = await fetch(actionUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'reset-offset',
+                    creator: creatorId,
+                    post_id: mediaId
+                })
+            });
+            const responseData = await response.json();
+            if (response.ok) {
+                toogleLoader('show', responseData.msg || 'Offset reset successfully', 'success');
+            } else {
+                toogleLoader('show', responseData.msg || 'Failed to reset offset', 'error');
+            }
+            setTimeout(() => toogleLoader('no-show'), 3000);
+        } catch (error) {
+            toogleLoader('show', 'Error resetting offset', 'error');
+            setTimeout(() => toogleLoader('no-show'), 3000);
+            console.error('Error resetting offset:', error);
+        }
+    });
+}
+
 const updateMediaId = (form) => {
     form.addEventListener('submit', async e => {
         e.preventDefault();
